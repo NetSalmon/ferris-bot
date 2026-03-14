@@ -2,6 +2,9 @@
 name = "ferris-bot"
 version = "0.1.0"
 edition = "2024"
+authors = ["netsalmon@disroot.org"]
+description = "A simple rust ai agent"
+license = "GPL-3.0"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -16,3 +19,4 @@ thiserror = "2.0.18"
 url = "2.5.2"
 dotenvy = "0.15.7"
 uuid = { version = "1.22.0", features = ["v4", "serde"]}
+dashmap = "7.0.0-rc2"

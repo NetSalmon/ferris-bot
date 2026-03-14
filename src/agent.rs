@@ -10,14 +10,17 @@ pub struct Agent {
     request: Request,
     content_tx: Sender<String>,
     reason_tx: Sender<String>,
-    input_rx: Receiver<String>,
+    input_tx: Sender<String>,
     tool_control: ToolControl,
+    _keep_alive_c: Receiver<String>,
+    _keep_alive_r: Receiver<String>,
+    _keep_alive_i: Receiver<String>,
 }
 
 pub struct AgentHandle {
     pub input_tx: Sender<String>,
-    pub content_rx: Receiver<String>,
-    pub reason_rx: Receiver<String>,
+    pub content_tx: Sender<String>,
+    pub reason_tx: Sender<String>,
 }
 
 impl Agent {
@@ -31,9 +34,12 @@ impl Agent {
         let mut agent = Agent {
             client,
             request,
-            content_tx,
-            reason_tx,
-            input_rx,
+            content_tx: content_tx.clone(),
+            reason_tx: reason_tx.clone(),
+            input_tx: input_tx.clone(),
+            _keep_alive_c: content_rx,
+            _keep_alive_r: reason_rx,
+            _keep_alive_i: input_rx,
             tool_control,
         };
 
@@ -50,8 +56,8 @@ impl Agent {
 
         let handle = AgentHandle {
             input_tx,
-            content_rx,
-            reason_rx,
+            content_tx,
+            reason_tx,
         };
 
         (agent, handle)
@@ -65,11 +71,12 @@ impl Agent {
 
     pub async fn run(&mut self) -> Result<(), AppError> {
         let mut in_feedback = false;
+        let mut input_rx = self.input_tx.subscribe();
 
         loop {
             if !in_feedback {
                 let input = tokio::select! {
-                    Ok(i) = self.input_rx.recv() => i,
+                    Ok(i) = input_rx.recv() => i,
                     else => break,
                 };
                 if input.to_lowercase().trim() == EXIT {

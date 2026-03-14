@@ -10,13 +10,14 @@ pub struct ToolControl {
     pub tools: Vec<Arc<dyn Tool>>,
     pub tool_entities: Vec<crate::entities::Tool>,
     pub tool_router: HashMap<String, Arc<dyn Tool>>,
-    pub control_rx: Receiver<bool>,
+    pub control_tx: Sender<bool>,
     pub output_tx: Sender<ToolContent>,
+    pub control_rx: Receiver<bool>,
 }
 
 pub struct ToolHandle {
     pub control_tx: Sender<bool>,
-    pub output_rx: Receiver<ToolContent>,
+    pub output_tx: Sender<ToolContent>,
 }
 
 #[derive(Serialize, Clone)]
@@ -29,20 +30,21 @@ pub enum ToolContent {
 
 impl ToolControl {
     pub fn new() -> (Self, ToolHandle) {
-        let (control_tx, control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
-        let (output_tx, output_rx) = tokio::sync::broadcast::channel::<ToolContent>(1024);
+        let (control_tx, _control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
+        let (output_tx, _output_rx) = tokio::sync::broadcast::channel::<ToolContent>(1024);
         
         let control = Self {
             tools: vec![],
             tool_entities: vec![],
             tool_router: HashMap::new(),
-            control_rx,
-            output_tx,
+            control_tx: control_tx.clone(),
+            output_tx: output_tx.clone(),
+            control_rx: control_tx.subscribe(),
         };
         
         let handle = ToolHandle {
             control_tx,
-            output_rx,
+            output_tx,
         };
 
         (control, handle)
