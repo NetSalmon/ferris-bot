@@ -1,7 +1,7 @@
-use std::process::Command;
-use serde_json::{json, Value};
 use crate::error::AppError;
 use crate::tools::{Args, Output, Tool};
+use serde_json::{Value, json};
+use std::process::Command;
 
 #[derive(Debug)]
 pub struct Cat {}
@@ -13,9 +13,7 @@ impl Tool for Cat {
 
     fn call(&self, arguments: &str) -> Result<String, AppError> {
         let arguments: Vec<String> = serde_json::from_str::<Args>(arguments)?.args;
-        let out = Command::new("cat")
-            .args(arguments)
-            .output()?;
+        let out = Command::new("cat").args(arguments).output()?;
 
         let output = Output {
             stdout: String::from_utf8(out.stdout)?,

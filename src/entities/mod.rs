@@ -1,6 +1,6 @@
 mod impls;
-pub mod stream;
 pub mod runtime;
+pub mod stream;
 
 use serde::{Deserialize, Serialize};
 
@@ -37,12 +37,12 @@ pub enum Message {
     System {
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        name: Option<String>
+        name: Option<String>,
     },
     User {
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        name: Option<String>
+        name: Option<String>,
     },
     Assistant {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,8 +95,7 @@ pub struct Response {
     pub usage: Option<Usage>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Choice {
     pub index: u32,
     pub message: Message,

@@ -1,14 +1,14 @@
-use dotenvy::dotenv;
 use crate::entities::runtime::Env;
 use crate::error::AppError;
+use dotenvy::dotenv;
 
-mod entities;
-mod client;
-mod tools;
 mod agent;
+pub mod agent_manager;
+mod client;
+mod entities;
 mod error;
 mod service;
-pub mod agent_manager;
+mod tools;
 
 /// TODO LIST
 ///

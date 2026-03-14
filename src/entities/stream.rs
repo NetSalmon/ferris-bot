@@ -23,7 +23,9 @@ impl DeltaChoice {
         let result = Choice {
             index: self.index,
             message: self.delta.export()?,
-            finish_reason: self.finish_reason.ok_or(InternalError("Missing finish_reason".into()))?,
+            finish_reason: self
+                .finish_reason
+                .ok_or(InternalError("Missing finish_reason".into()))?,
         };
 
         Ok(result)
@@ -77,17 +79,16 @@ impl DeltaMessage {
 
         if let Some(tool_calls) = &delta.tool_calls {
             for item in tool_calls {
-                let found = self.tool_calls
+                let found = self
+                    .tool_calls
                     .get_or_insert(Vec::new())
                     .iter_mut()
-                    .find(|e| {e.index == item.index});
+                    .find(|e| e.index == item.index);
 
                 if let Some(found) = found {
                     found.function.arguments.push_str(&item.function.arguments);
                 } else {
-                    self.tool_calls
-                        .get_or_insert(Vec::new())
-                        .push(item.clone());
+                    self.tool_calls.get_or_insert(Vec::new()).push(item.clone());
                 }
             }
         }
@@ -106,7 +107,9 @@ impl DeltaToolCall {
     pub fn export(self) -> Result<ToolCall, AppError> {
         let result = ToolCall {
             id: self.id.ok_or(InternalError("No id provided".into()))?,
-            r#type: self.r#type.ok_or(InternalError("No type provided".into()))?,
+            r#type: self
+                .r#type
+                .ok_or(InternalError("No type provided".into()))?,
             function: self.function.export()?,
         };
 
@@ -133,7 +136,8 @@ impl DeltaCallFunction {
 
 impl ChoicesBuffer {
     fn merge(&mut self, delta_choice: &DeltaChoice) {
-        let founded = self.choices
+        let founded = self
+            .choices
             .iter_mut()
             .find(|c| c.index == delta_choice.index);
 

@@ -1,9 +1,9 @@
+use crate::EXIT;
 use crate::client::Client;
 use crate::entities::{Message, Request};
 use crate::error::AppError;
 use crate::tools::control::ToolControl;
 use tokio::sync::broadcast::{Receiver, Sender};
-use crate::EXIT;
 
 pub struct Agent {
     client: Client,
@@ -24,7 +24,11 @@ pub struct AgentHandle {
 }
 
 impl Agent {
-    pub fn new(client: Client, request: Request, tool_control: ToolControl) -> (Agent, AgentHandle) {
+    pub fn new(
+        client: Client,
+        request: Request,
+        tool_control: ToolControl,
+    ) -> (Agent, AgentHandle) {
         let (content_tx, content_rx) = tokio::sync::broadcast::channel(1024);
         let (reason_tx, reason_rx) = tokio::sync::broadcast::channel(1024);
         let (input_tx, input_rx) = tokio::sync::broadcast::channel(1024);
@@ -92,10 +96,22 @@ impl Agent {
 
             let response = if self.request.stream == Some(true) {
                 use crate::client::stream::StreamAPI;
-                StreamAPI::send(&mut self.client, &self.content_tx, &self.reason_tx, &self.request).await?
+                StreamAPI::send(
+                    &mut self.client,
+                    &self.content_tx,
+                    &self.reason_tx,
+                    &self.request,
+                )
+                .await?
             } else {
                 use crate::client::batch::BatchAPI;
-                BatchAPI::send(&mut self.client, &self.content_tx, &self.reason_tx, &self.request).await?
+                BatchAPI::send(
+                    &mut self.client,
+                    &self.content_tx,
+                    &self.reason_tx,
+                    &self.request,
+                )
+                .await?
             };
 
             for choice in &response.choices {
@@ -105,12 +121,12 @@ impl Agent {
             for choice in &response.choices {
                 let Message::Assistant { tool_calls, .. } = choice.message.clone() else {
                     in_feedback = false;
-                    continue
+                    continue;
                 };
 
                 let Some(tool_calls) = tool_calls.filter(|c| !c.is_empty()) else {
                     in_feedback = false;
-                    continue
+                    continue;
                 };
 
                 if tool_calls.len() == 0 {
@@ -120,20 +136,21 @@ impl Agent {
 
                 in_feedback = true;
                 for tool_call in tool_calls {
-                    let result = self.tool_control.call(
-                        &tool_call.function.name,
-                        &tool_call.function.arguments,
-                        &tool_call.id
-                    ).await;
+                    let result = self
+                        .tool_control
+                        .call(
+                            &tool_call.function.name,
+                            &tool_call.function.arguments,
+                            &tool_call.id,
+                        )
+                        .await;
 
                     let message = match result {
                         Ok(message) => message,
-                        Err(e) => {
-                            Message::Tool {
-                                content: format!("Tool Call Error: {}", e.to_string()),
-                                tool_call_id: tool_call.id,
-                            }
-                        }
+                        Err(e) => Message::Tool {
+                            content: format!("Tool Call Error: {}", e.to_string()),
+                            tool_call_id: tool_call.id,
+                        },
                     };
 
                     self.request.push_message(message);

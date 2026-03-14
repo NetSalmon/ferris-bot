@@ -1,16 +1,16 @@
-pub mod control;
 pub mod bash;
-pub mod get_weather;
-pub mod ls;
 pub mod cat;
-pub mod tail;
-pub mod sed;
+pub mod control;
+pub mod get_weather;
 pub mod grep;
+pub mod ls;
+pub mod sed;
+pub mod tail;
 
 use crate::error::AppError;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Debug;
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct Output {
@@ -25,8 +25,10 @@ struct Args {
     args: Vec<String>,
 }
 
-pub trait Tool : Sync + Send + Debug {
-    fn new() -> Self where Self: Sized;
+pub trait Tool: Sync + Send + Debug {
+    fn new() -> Self
+    where
+        Self: Sized;
     fn call(&self, arguments: &str) -> Result<String, AppError>;
     fn name(&self) -> String;
     fn description(&self) -> String;

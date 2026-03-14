@@ -3,8 +3,8 @@ use crate::error::AppError::{InternalError, NotFound};
 use crate::service::AgentState;
 use crate::tools::control::ToolContent;
 use axum::extract::{Path, State};
-use axum::response::sse::{Event, KeepAlive};
 use axum::response::Sse;
+use axum::response::sse::{Event, KeepAlive};
 use futures_util::Stream;
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -12,19 +12,20 @@ use std::time::Duration;
 use tokio::sync::broadcast::error::RecvError;
 use uuid::Uuid;
 
-pub async fn list_agent(
-    State(state): State<Arc<AgentState>>,
-) -> Result<String, AppError> {
-    let result = serde_json::to_string(&state.manager.handles.iter()
-        .map(|entry| *entry.key())
-        .collect::<Vec<_>>())?;
+pub async fn list_agent(State(state): State<Arc<AgentState>>) -> Result<String, AppError> {
+    let result = serde_json::to_string(
+        &state
+            .manager
+            .handles
+            .iter()
+            .map(|entry| *entry.key())
+            .collect::<Vec<_>>(),
+    )?;
     Ok(result)
 }
 
-pub async fn create_agent(
-    State(state): State<Arc<AgentState>>,
-) -> Result<String, AppError> {
-    let uuid =state.manager.create().await?;
+pub async fn create_agent(State(state): State<Arc<AgentState>>) -> Result<String, AppError> {
+    let uuid = state.manager.create().await?;
     Ok(uuid.to_string())
 }
 
@@ -125,7 +126,10 @@ pub async fn tool_control(
         return Err(NotFound(uuid.to_string()));
     };
     let approve = *body;
-    handle.tool_handle.control_tx.send(approve)
+    handle
+        .tool_handle
+        .control_tx
+        .send(approve)
         .map_err(|e| InternalError(format!("Failed to send tool control: {}", e)))?;
     Ok(())
 }

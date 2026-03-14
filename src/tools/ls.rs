@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::tools::{Args, Output, Tool};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::process::Command;
 
 #[derive(Debug)]
@@ -13,9 +13,7 @@ impl Tool for Ls {
 
     fn call(&self, arguments: &str) -> Result<String, AppError> {
         let args: Vec<String> = serde_json::from_str::<Args>(arguments)?.args;
-        let output = Command::new("ls")
-            .args(args)
-            .output()?;
+        let output = Command::new("ls").args(args).output()?;
 
         let output = Output {
             stdout: String::from_utf8(output.stdout)?,

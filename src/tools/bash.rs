@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::tools::{Output, Tool};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::process::Command;
 
 #[derive(Debug)]
@@ -15,9 +15,7 @@ impl Tool for Bash {
         let args = serde_json::from_str::<Value>(arguments)?;
         let script = args["script"].as_str().unwrap_or("echo \"ERROR\"");
 
-        let output = Command::new("bash")
-            .args(&["-c", script])
-            .output()?;
+        let output = Command::new("bash").args(&["-c", script]).output()?;
 
         let output = Output {
             stdout: String::from_utf8(output.stdout)?,

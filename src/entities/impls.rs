@@ -26,10 +26,13 @@ impl Request {
     }
 
     pub fn push_message(&mut self, message: Message) {
-        let marked = MarkedMessage {id: self.messages.len(), message};
+        let marked = MarkedMessage {
+            id: self.messages.len(),
+            message,
+        };
         self.messages.push(marked);
     }
-    
+
     pub fn push_tool(mut self, tool: Tool) {
         match &mut self.tools {
             Some(tools) => tools.push(tool),
@@ -42,7 +45,12 @@ impl RequestBuilder {
     pub fn build(self) -> Request {
         Request {
             model: self.model,
-            messages: self.messages.into_iter().enumerate().map(|(id, message)| MarkedMessage {id, message}).collect(),
+            messages: self
+                .messages
+                .into_iter()
+                .enumerate()
+                .map(|(id, message)| MarkedMessage { id, message })
+                .collect(),
             tools: self.tools,
             tool_choice: self.tool_choice,
             temperature: self.temperature,
@@ -84,7 +92,7 @@ impl RequestBuilder {
         self.enable_thinking = Some(true);
         self
     }
-    
+
     pub fn disable_thinking(mut self) -> Self {
         self.enable_thinking = Some(false);
         self
@@ -94,7 +102,7 @@ impl RequestBuilder {
         self.stream = Some(true);
         self
     }
-    
+
     pub fn disable_stream(mut self) -> Self {
         self.stream = Some(false);
         self

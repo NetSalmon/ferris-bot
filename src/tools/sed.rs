@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::tools::{Args, Output, Tool};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::process::Command;
 
 #[derive(Debug)]
@@ -13,9 +13,7 @@ impl Tool for Sed {
 
     fn call(&self, arguments: &str) -> Result<String, AppError> {
         let arguments: Vec<String> = serde_json::from_str::<Args>(arguments)?.args;
-        let out = Command::new("sed")
-            .args(arguments)
-            .output()?;
+        let out = Command::new("sed").args(arguments).output()?;
 
         // 封装输出结果
         let output = Output {

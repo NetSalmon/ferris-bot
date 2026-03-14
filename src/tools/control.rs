@@ -24,7 +24,7 @@ pub struct ToolHandle {
 #[serde(tag = "type")]
 #[serde(rename_all = "lowercase")]
 pub enum ToolContent {
-    Calling{name: String, arguments: String },
+    Calling { name: String, arguments: String },
     Output(String),
 }
 
@@ -32,7 +32,7 @@ impl ToolControl {
     pub fn new() -> (Self, ToolHandle) {
         let (control_tx, _control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
         let (output_tx, _output_rx) = tokio::sync::broadcast::channel::<ToolContent>(1024);
-        
+
         let control = Self {
             tools: vec![],
             tool_entities: vec![],
@@ -41,7 +41,7 @@ impl ToolControl {
             output_tx: output_tx.clone(),
             control_rx: control_tx.subscribe(),
         };
-        
+
         let handle = ToolHandle {
             control_tx,
             output_tx,
@@ -49,51 +49,62 @@ impl ToolControl {
 
         (control, handle)
     }
-    
+
     pub fn add_tool(&mut self, tool: Arc<dyn Tool>) {
         self.tool_router.insert(tool.name(), tool.clone());
         self.tools.push(tool.clone());
-        
+
         let entity = crate::entities::Tool {
             r#type: "function".to_string(),
             function: FunctionDetail {
                 name: tool.name(),
                 description: tool.description(),
                 parameters: tool.parameters(),
-            }
+            },
         };
-        
+
         self.tool_entities.push(entity);
     }
-    
+
     pub fn add_tools(&mut self, tools: &[Arc<dyn Tool>]) {
         for tool in tools {
             self.add_tool(Arc::clone(tool));
         }
     }
-    
-    pub async fn call(&mut self, name: &str, arguments: &str, id: &str) -> Result<Message, AppError> {
+
+    pub async fn call(
+        &mut self,
+        name: &str,
+        arguments: &str,
+        id: &str,
+    ) -> Result<Message, AppError> {
         let content = ToolContent::Calling {
             name: name.to_string(),
             arguments: arguments.to_string(),
         };
-        
-        self.output_tx.send(content).map_err(|err| AppError::InternalError(err.to_string()))?;
-        
-        if let Ok(approvement) = self.control_rx.recv().await && approvement{
+
+        self.output_tx
+            .send(content)
+            .map_err(|err| AppError::InternalError(err.to_string()))?;
+
+        if let Ok(approvement) = self.control_rx.recv().await
+            && approvement
+        {
             let Some(tool) = self.tool_router.get(name) else {
                 return Err(AppError::NoSuchToolError(name.to_string()));
             };
-            
+
             let result = tool.call(arguments)?;
-            
-            self.output_tx.send(ToolContent::Output(result.clone())).map_err(|err| AppError::InternalError(err.to_string()))?;
-            
+
+            self.output_tx
+                .send(ToolContent::Output(result.clone()))
+                .map_err(|err| AppError::InternalError(err.to_string()))?;
+
             let msg = Message::Tool {
                 tool_call_id: id.to_string(),
                 content: result,
             };
-            
+
             Ok(msg)
         } else {
             Err(AppError::NoApprovementActionError(name.to_string()))

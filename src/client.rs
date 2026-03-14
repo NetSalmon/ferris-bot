@@ -1,9 +1,9 @@
-pub mod stream;
 pub mod batch;
+pub mod stream;
 
-use reqwest::header::AUTHORIZATION;
-use reqwest::header::{HeaderValue, CONTENT_TYPE};
 use crate::error::AppError;
+use reqwest::header::AUTHORIZATION;
+use reqwest::header::{CONTENT_TYPE, HeaderValue};
 
 pub struct Client {
     client: reqwest::Client,
@@ -27,7 +27,6 @@ impl Client {
 }
 
 impl ClientBuilder {
-
     pub fn set_base_url(&mut self, base_url: &reqwest::Url) -> &mut Self {
         self.base_url = Some(base_url.clone());
         self
@@ -35,7 +34,8 @@ impl ClientBuilder {
 
     pub fn set_api_key(&mut self, api_key: &str) -> Result<&mut Self, AppError> {
         let key = format!("Bearer {}", api_key);
-        self.headers.insert(AUTHORIZATION, HeaderValue::from_str(&key)?);
+        self.headers
+            .insert(AUTHORIZATION, HeaderValue::from_str(&key)?);
         Ok(self)
     }
 

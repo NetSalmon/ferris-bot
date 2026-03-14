@@ -1,14 +1,14 @@
+use crate::EXIT;
 use crate::agent::{Agent, AgentHandle};
 use crate::client::Client;
 use crate::entities::runtime::Env;
 use crate::entities::{Message, Request};
 use crate::error::AppError;
 use crate::tools::control::{ToolControl, ToolHandle};
-use crate::tools::{bash, cat, get_weather, grep, ls, sed, tail, Tool};
-use std::sync::Arc;
+use crate::tools::{Tool, bash, cat, get_weather, grep, ls, sed, tail};
 use dashmap::DashMap;
+use std::sync::Arc;
 use uuid::Uuid;
-use crate::EXIT;
 
 pub struct AgentManager {
     pub handles: DashMap<Uuid, Arc<ServerHandle>>,
@@ -36,7 +36,9 @@ impl AgentManager {
     }
 
     pub fn input(&self, uuid: &Uuid, body: &str) -> Result<(), AppError> {
-        let handle = self.handles.get(uuid)
+        let handle = self
+            .handles
+            .get(uuid)
             .ok_or(AppError::NotFound(uuid.to_string()))?;
 
         handle.agent_handle.input_tx.send(body.to_string())?;
@@ -57,7 +59,7 @@ impl AgentManager {
         ]);
 
         let Some(env) = &self.env else {
-            return Err(AppError::InternalError("No env provide".to_string()))
+            return Err(AppError::InternalError("No env provide".to_string()));
         };
 
         let client = Client::builder()

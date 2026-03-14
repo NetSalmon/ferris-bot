@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use crate::error::AppError;
 use crate::tools::Tool;
+use serde_json::{Value, json};
 
 #[derive(Debug)]
 pub struct GetWeather {}

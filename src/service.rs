@@ -19,19 +19,24 @@ pub async fn run(env: Env) -> Result<(), AppError> {
     };
 
     let router = axum::Router::new()
-        .route("/agent/{uuid}", post(handlers::input)
-            .get(handlers::content)
-            .delete(handlers::remove_agent)
+        .route(
+            "/agent/{uuid}",
+            post(handlers::input)
+                .get(handlers::content)
+                .delete(handlers::remove_agent),
         )
-        .route("/agent/{uuid}/tool", post(handlers::tool_control).get(handlers::tool_output))
+        .route(
+            "/agent/{uuid}/tool",
+            post(handlers::tool_control).get(handlers::tool_output),
+        )
         .route("/all", get(handlers::list_agent))
         .route("/create", get(handlers::create_agent))
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(state));
 
     let addr = tokio::net::TcpListener::bind("0.0.0.0:11451").await?;
-    
+
     axum::serve(addr, router).await?;
-    
+
     Ok(())
 }
