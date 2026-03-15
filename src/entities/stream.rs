@@ -191,3 +191,16 @@ impl ResponseBuffer {
         Ok(result)
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type")]
+#[serde(rename_all = "lowercase")]
+pub enum DAOChunk {
+    Reason {
+        content: String
+    },
+    Content {
+        content: String,
+    },
+    End,
+}
