@@ -9,7 +9,7 @@ use crate::tools::control::ToolControl;
 use crate::tools::{Tool, bash, cat, grep, ls, sed, tail};
 use dashmap::DashMap;
 use std::sync::Arc;
-use tokio::sync::broadcast::Sender;
+use tokio::sync::broadcast::{Sender, Receiver};
 use uuid::Uuid;
 
 pub struct AgentManager {
@@ -21,6 +21,9 @@ pub struct ServerHandle {
     pub input_tx: Sender<String>,
     pub output_tx: Sender<Chunk>,
     pub control_tx: Sender<bool>,
+    pub _input_rx: Receiver<String>,
+    pub _output_rx: Receiver<Chunk>,
+    pub _control_rx: Receiver<bool>,
 }
 
 impl AgentManager {
@@ -95,6 +98,9 @@ impl AgentManager {
             input_tx: input_tx.clone(),
             output_tx: output_tx.clone(),
             control_tx: control_tx.clone(),
+            _control_rx,
+            _input_rx,
+            _output_rx,
         };
 
         let uuid = Uuid::new_v4();

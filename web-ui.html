@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ferris Bot</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #eaeaea;
+            --text-secondary: #a0a0a0;
+            --accent: #e94560;
+            --accent-hover: #ff6b6b;
+            --border: #2d3748;
+            --success: #48bb78;
+            --warning: #ed8936;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.25rem;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+
+        .create-btn {
+            width: 100%;
+            padding: 10px 16px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .create-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .agent-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .agent-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .agent-item:hover {
+            background: var(--border);
+        }
+
+        .agent-item.active {
+            border: 2px solid var(--accent);
+        }
+
+        .agent-id {
+            font-size: 0.85rem;
+            font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .delete-btn:hover {
+            color: var(--accent);
+            background: rgba(233, 69, 96, 0.2);
+        }
+
+        /* Main Chat Area */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-header h2 {
+            font-size: 1rem;
+            font-weight: normal;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+        }
+
+        .message.user {
+            background: var(--accent);
+            align-self: flex-end;
+        }
+
+        .message.assistant {
+            background: var(--bg-secondary);
+            align-self: flex-start;
+        }
+
+        .message.system {
+            background: var(--bg-tertiary);
+            align-self: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .message pre {
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .message code {
+            font-family: 'Fira Code', 'Monaco', monospace;
+            font-size: 0.9rem;
+        }
+
+        .message p {
+            margin-bottom: 8px;
+        }
+
+        .message p:last-child {
+            margin-bottom: 0;
+        }
+
+        .reasoning {
+            background: rgba(237, 137, 54, 0.1);
+            border-left: 3px solid var(--warning);
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .tool-call {
+            background: rgba(72, 187, 120, 0.1);
+            border: 1px solid var(--success);
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+        }
+
+        .tool-call-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .tool-call-name {
+            font-weight: bold;
+            color: var(--success);
+        }
+
+        .tool-approval {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tool-approval button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .approve-btn {
+            background: var(--success);
+            color: white;
+        }
+
+        .approve-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .reject-btn {
+            background: var(--accent);
+            color: white;
+        }
+
+        .reject-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .tool-output {
+            background: rgba(233, 69, 96, 0.1);
+            border: 1px solid var(--accent);
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .tool-output .stdout {
+            color: var(--success);
+        }
+
+        .tool-output .stderr {
+            color: var(--accent);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .chat-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            resize: none;
+            min-height: 48px;
+            max-height: 200px;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Empty State */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .empty-state h2 {
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Loading animation */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 12px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Markdown styles */
+        .message.assistant ul, .message.assistant ol {
+            margin-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        .message.assistant li {
+            margin-bottom: 4px;
+        }
+
+        .message.assistant h1, .message.assistant h2, .message.assistant h3 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+
+        .message.assistant a {
+            color: var(--accent);
+        }
+
+        .message.assistant blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+            margin: 8px 0;
+            color: var(--text-secondary);
+        }
+
+        .message.assistant table {
+            border-collapse: collapse;
+            margin: 8px 0;
+        }
+
+        .message.assistant th, .message.assistant td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+        }
+
+        .message.assistant th {
+            background: var(--bg-tertiary);
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>Ferris Bot</h1>
+            <button class="create-btn" onclick="createAgent()">+ New Agent</button>
+        </div>
+        <div class="agent-list" id="agentList">
+            <!-- Agent items will be inserted here -->
+        </div>
+    </div>
+
+    <div class="main" id="mainArea">
+        <div class="empty-state" id="emptyState">
+            <h2>Welcome to Ferris Bot</h2>
+            <p>Create an agent to start chatting</p>
+        </div>
+
+        <div class="chat-container hidden" id="chatContainer">
+            <div class="chat-header">
+                <div class="status-dot" id="statusDot"></div>
+                <h2 id="agentIdDisplay">Agent ID</h2>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <!-- Messages will be inserted here -->
+            </div>
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <textarea
+                        class="chat-input"
+                        id="chatInput"
+                        placeholder="Type your message..."
+                        rows="1"
+                    ></textarea>
+                </div>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:11451';
+
+        // State
+        let agents = [];
+        let activeAgentId = null;
+        let eventSource = null;
+        let currentAssistantMessage = '';
+        let currentReasoning = '';
+        let isWaitingForApproval = false;
+
+        // Marked configuration
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true
+        });
+
+        // API functions
+        async function fetchAgents() {
+            try {
+                const response = await fetch(`${API_BASE}/all`);
+                const data = await response.json();
+                if (data.ok) {
+                    agents = data.result;
+                    renderAgentList();
+                } else {
+                    console.error('Failed to fetch agents:', data.result);
+                }
+            } catch (error) {
+                console.error('Failed to fetch agents:', error);
+            }
+        }
+
+        async function createAgent() {
+            try {
+                const response = await fetch(`${API_BASE}/create`);
+                const data = await response.json();
+                if (data.ok) {
+                    agents.push(data.result);
+                    renderAgentList();
+                    selectAgent(data.result);
+                } else {
+                    console.error('Failed to create agent:', data.result);
+                    alert('Failed to create agent: ' + data.result);
+                }
+            } catch (error) {
+                console.error('Failed to create agent:', error);
+                alert('Failed to create agent');
+            }
+        }
+
+        async function deleteAgent(uuid) {
+            if (!confirm('Are you sure you want to delete this agent?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/agent/${uuid}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.ok) {
+                    agents = agents.filter(id => id !== uuid);
+                    renderAgentList();
+                    if (activeAgentId === uuid) {
+                        disconnectEventSource();
+                        activeAgentId = null;
+                        showEmptyState();
+                    }
+                } else {
+                    console.error('Failed to delete agent:', data.result);
+                    alert('Failed to delete agent: ' + data.result);
+                }
+            } catch (error) {
+                console.error('Failed to delete agent:', error);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message || !activeAgentId) return;
+
+            addMessage('user', message);
+            input.value = '';
+            input.style.height = 'auto';
+
+            try {
+                const response = await fetch(`${API_BASE}/agent/${activeAgentId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: message
+                });
+                const data = await response.json();
+                if (!data.ok) {
+                    console.error('Failed to send message:', data.result);
+                    addSystemMessage('Error: ' + data.result);
+                }
+            } catch (error) {
+                console.error('Failed to send message:', error);
+            }
+        }
+
+        async function sendToolApproval(approved) {
+            if (!activeAgentId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/agent/${activeAgentId}/tool`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(approved)
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    isWaitingForApproval = false;
+                } else {
+                    console.error('Failed to send tool approval:', data.result);
+                }
+            } catch (error) {
+                console.error('Failed to send tool approval:', error);
+            }
+        }
+
+        // UI functions
+        function renderAgentList() {
+            const list = document.getElementById('agentList');
+            list.innerHTML = agents.map(uuid => `
+                <div class="agent-item ${uuid === activeAgentId ? 'active' : ''}" onclick="selectAgent('${uuid}')">
+                    <span class="agent-id">${uuid.substring(0, 8)}...</span>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteAgent('${uuid}')">x</button>
+                </div>
+            `).join('');
+        }
+
+        function selectAgent(uuid) {
+            if (activeAgentId === uuid) return;
+
+            disconnectEventSource();
+            activeAgentId = uuid;
+            renderAgentList();
+            showChatContainer();
+            document.getElementById('agentIdDisplay').textContent = uuid;
+            document.getElementById('chatMessages').innerHTML = '';
+            connectEventSource(uuid);
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').classList.remove('hidden');
+            document.getElementById('chatContainer').classList.add('hidden');
+        }
+
+        function showChatContainer() {
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('chatContainer').classList.remove('hidden');
+        }
+
+        function addMessage(role, content) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+
+            if (role === 'assistant') {
+                div.innerHTML = marked.parse(content);
+            } else if (role === 'user') {
+                div.textContent = content;
+            } else {
+                div.textContent = content;
+            }
+
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            return div;
+        }
+
+        function addSystemMessage(content) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'message system';
+            div.textContent = content;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addToolCallElement(name, arguments) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'tool-call';
+            div.id = 'current-tool-call';
+
+            let argsDisplay = arguments;
+            try {
+                const parsed = JSON.parse(arguments);
+                argsDisplay = JSON.stringify(parsed, null, 2);
+            } catch (e) {}
+
+            div.innerHTML = `
+                <div class="tool-call-header">
+                    <span class="tool-call-name">Tool: ${name}</span>
+                    <div class="tool-approval">
+                        <button class="approve-btn" onclick="sendToolApproval(true)">Approve</button>
+                        <button class="reject-btn" onclick="sendToolApproval(false)">Reject</button>
+                    </div>
+                </div>
+                <pre><code>${escapeHtml(argsDisplay)}</code></pre>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            isWaitingForApproval = true;
+        }
+
+        function addToolOutputElement(stdout, stderr, status) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'tool-output';
+
+            let html = '';
+            if (stdout) {
+                html += `<div class="stdout">stdout:\n${escapeHtml(stdout)}</div>`;
+            }
+            if (stderr) {
+                html += `<div class="stderr">stderr:\n${escapeHtml(stderr)}</div>`;
+            }
+            if (status !== null && status !== undefined) {
+                html += `<div>Status: ${status}</div>`;
+            }
+            div.innerHTML = html;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateLastAssistantMessage() {
+            const container = document.getElementById('chatMessages');
+            let lastAssistant = container.querySelector('.message.assistant:last-child');
+
+            if (!lastAssistant) {
+                lastAssistant = addMessage('assistant', currentAssistantMessage);
+            } else {
+                lastAssistant.innerHTML = marked.parse(currentAssistantMessage);
+            }
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // EventSource handling
+        function connectEventSource(uuid) {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const statusDot = document.getElementById('statusDot');
+
+            eventSource = new EventSource(`${API_BASE}/agent/${uuid}`);
+
+            eventSource.onopen = () => {
+                statusDot.classList.add('connected');
+            };
+
+            // 服务端使用 event("data")，所以需要监听 "data" 事件
+            eventSource.addEventListener('data', (event) => {
+                if (event.data === '[DONE]') {
+                    // Event ended, finalize message
+                    if (currentAssistantMessage) {
+                        updateLastAssistantMessage();
+                        currentAssistantMessage = '';
+                    }
+                    currentReasoning = '';
+                    return;
+                }
+
+                try {
+                    const chunk = JSON.parse(event.data);
+                    handleChunk(chunk);
+                } catch (e) {
+                    console.error('Failed to parse chunk:', e, event.data);
+                }
+            });
+
+            eventSource.onerror = () => {
+                statusDot.classList.remove('connected');
+                console.log('EventSource disconnected');
+            };
+        }
+
+        function handleChunk(chunk) {
+            switch (chunk.type) {
+                case 'block':
+                    addSystemMessage(`Blocked: ${chunk.reason} - ${chunk.content}`);
+                    break;
+
+                case 'tool_call':
+                    addToolCallElement(chunk.name, chunk.arguments);
+                    break;
+
+                case 'tool_output':
+                    addToolOutputElement(chunk.stdout, chunk.stderr, chunk.status);
+                    break;
+
+                case 'reason_chunk':
+                    const container = document.getElementById('chatMessages');
+                    let reasoningDiv = container.querySelector('.reasoning:last-child');
+
+                    if (!reasoningDiv || !reasoningDiv.classList.contains('active-reasoning')) {
+                        reasoningDiv = document.createElement('div');
+                        reasoningDiv.className = 'reasoning active-reasoning';
+                        reasoningDiv.innerHTML = '<strong>Thinking...</strong><br>';
+                        container.appendChild(reasoningDiv);
+                    }
+
+                    currentReasoning += chunk.content;
+                    reasoningDiv.innerHTML = `<strong>Thinking...</strong><br>${escapeHtml(currentReasoning)}`;
+                    container.scrollTop = container.scrollHeight;
+                    break;
+
+                case 'content_chunk':
+                    // Finalize reasoning
+                    const container2 = document.getElementById('chatMessages');
+                    const activeReasoning = container2.querySelector('.active-reasoning');
+                    if (activeReasoning) {
+                        activeReasoning.classList.remove('active-reasoning');
+                    }
+
+                    currentAssistantMessage += chunk.content;
+                    updateLastAssistantMessage();
+                    break;
+            }
+        }
+
+        function disconnectEventSource() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
+        // Input handling
+        const chatInput = document.getElementById('chatInput');
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
+        });
+
+        // Initialize
+        fetchAgents();
+        setInterval(fetchAgents, 5000); // Poll every 5 seconds
+    </script>
+</body>
+</html>

@@ -38,10 +38,11 @@ pub struct Request {
     enable_thinking: Option<bool>,
 }
 
-impl Request {
-    pub fn get_all_messages(&self) -> Vec<Message> {
-        self.messages.iter().map(|m| m.to_message()).collect()
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+pub enum AgentInput {
+    Input(String),
+    MessageRequest,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

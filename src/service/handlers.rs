@@ -73,11 +73,13 @@ pub async fn content(
         }
     };
 
-    Ok(Sse::new(stream).keep_alive(
+    let sse = Sse::new(stream).keep_alive(
         KeepAlive::new()
             .interval(Duration::from_secs(15))
             .text("keep-alive"),
-    ))
+    );
+
+    Ok(sse)
 }
 
 pub async fn tool_control(
