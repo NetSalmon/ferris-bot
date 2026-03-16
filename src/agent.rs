@@ -1,16 +1,17 @@
-use crate::EXIT;
 use crate::client::Client;
 use crate::entities::stream::Chunk;
-use crate::entities::{Message, Request};
+use crate::entities::stream::Chunk::Messages;
+use crate::entities::{AgentTask, Message, Request};
 use crate::error::AppError;
 use crate::tools::control::ToolControl;
+use crate::EXIT;
 use tokio::sync::broadcast::Sender;
 
 pub struct Agent {
     client: Client,
     request: Request,
+    input_rx: tokio::sync::mpsc::Receiver<AgentTask>,
     output_tx: Sender<Chunk>,
-    input_tx: Sender<String>,
     tool_control: ToolControl,
 }
 
@@ -19,7 +20,7 @@ impl Agent {
         client: Client,
         request: Request,
         output_tx: Sender<Chunk>,
-        input_tx: Sender<String>,
+        input_rx: tokio::sync::mpsc::Receiver<AgentTask>,
         tool_control: ToolControl,
     ) -> Agent {
         let tools = tool_control.tool_entities.clone();
@@ -28,7 +29,7 @@ impl Agent {
             client,
             request,
             output_tx: output_tx.clone(),
-            input_tx: input_tx.clone(),
+            input_rx,
             tool_control,
         };
 
@@ -48,13 +49,25 @@ impl Agent {
 
     pub async fn run(&mut self) -> Result<(), AppError> {
         let mut in_feedback = false;
-        let mut input_rx = self.input_tx.subscribe();
 
         loop {
             if !in_feedback {
-                let input = tokio::select! {
-                    Ok(i) = input_rx.recv() => i,
-                    else => break,
+                let input = loop {
+                    let Some(input) = self.input_rx.recv().await else {
+                        continue;
+                    };
+                    match input {
+                        AgentTask::Input {content} => {
+                            break content;
+                        }
+                        AgentTask::MessageRequest { channel } => {
+                            let chunk = Messages {
+                                messages: self.request.messages.clone(),
+                            };
+                            // 如果发送失败，说明接收端已关闭，忽略即可
+                            let _ = channel.send(chunk);
+                        }
+                    }
                 };
                 if input.to_lowercase().trim() == EXIT {
                     break;

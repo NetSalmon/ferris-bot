@@ -5,6 +5,7 @@ use crate::error::AppError;
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::{CONTENT_TYPE, HeaderValue};
 
+#[derive(Clone)]
 pub struct Client {
     client: reqwest::Client,
     base_url: reqwest::Url,

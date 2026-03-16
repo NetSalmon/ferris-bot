@@ -3,6 +3,7 @@ pub mod runtime;
 pub mod stream;
 
 use serde::{Deserialize, Serialize};
+use crate::entities::stream::Chunk;
 
 #[derive(Serialize, Debug)]
 pub struct ApiResponse<T> {
@@ -38,11 +39,10 @@ pub struct Request {
     enable_thinking: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type")]
-pub enum AgentInput {
-    Input(String),
-    MessageRequest,
+#[derive(Debug)]
+pub enum AgentTask {
+    Input { content: String },
+    MessageRequest { channel: tokio::sync::oneshot::Sender<Chunk> }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

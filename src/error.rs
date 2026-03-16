@@ -1,24 +1,26 @@
-use crate::entities::ApiResponse;
 use crate::entities::stream::Chunk;
-use axum::Error as AxumError;
+use crate::entities::{AgentTask, ApiResponse};
 use axum::http::Error as HttpError;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::response::Json;
-use reqwest::Error as ReqwestError;
+use axum::Error as AxumError;
 use reqwest::header::InvalidHeaderValue;
+use reqwest::Error as ReqwestError;
 use serde_json::Error as SerdeJsonError;
 use std::env::VarError;
 use std::io::Error as IoError;
 use std::string::FromUtf8Error;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::error::SendError;
+use tokio::sync::mpsc::error::SendError as MpscSendError;
+use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
 use tokio::task::JoinError;
 use url::ParseError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum AppError {
-    #[error("internal error: {0}")]
+    #[error("Internal error: {0}")]
     InternalError(String),
     #[error("Not found: {0}")]
     NotFound(String),
@@ -26,7 +28,7 @@ pub enum AppError {
     IOError(#[from] IoError),
     #[error("JSON error: {0}")]
     JSONError(#[from] SerdeJsonError),
-    #[error("Net error: {0}")]
+    #[error("Network error: {0}")]
     NetError(#[from] ReqwestError),
     #[error("Header value error: {0}")]
     HeaderValueError(#[from] InvalidHeaderValue),
@@ -44,14 +46,26 @@ pub enum AppError {
     AxumError(#[from] AxumError),
     #[error("HTTP error: {0}")]
     HttpError(#[from] HttpError),
-    #[error("No such environment variable {0}")]
+    #[error("Environment variable error: {0}")]
     EnvError(#[from] VarError),
-    #[error("No such tool: {0}")]
+    #[error("Tool not found: {0}")]
     NoSuchToolError(String),
-    #[error("Use disallow this action: {0}")]
+    #[error("Action not approved: {0}")]
     NoApprovementActionError(String),
     #[error("Chunk send error: {0}")]
     ChunkSendError(#[from] SendError<Chunk>),
+    #[error("Agent task send error: {0}")]
+    AgentTaskSendError(#[from] MpscSendError<AgentTask>),
+    #[error("Oneshot receive error: {0}")]
+    OneshotRecvError(#[from] OneshotRecvError),
+    #[error("Tool control send error: {0}")]
+    ToolControlSendError(String),
+}
+
+impl From<SendError<bool>> for AppError {
+    fn from(err: SendError<bool>) -> Self {
+        AppError::ToolControlSendError(err.to_string())
+    }
 }
 
 impl IntoResponse for AppError {
@@ -77,7 +91,10 @@ impl IntoResponse for AppError {
             | AppError::AxumError(_)
             | AppError::HttpError(_)
             | AppError::ChunkSendError(_)
-            | AppError::EnvError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            | AppError::AgentTaskSendError(_)
+            | AppError::OneshotRecvError(_)
+            | AppError::EnvError(_)
+            | AppError::ToolControlSendError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
         let body = Json(ApiResponse::err(error_message));

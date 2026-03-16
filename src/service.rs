@@ -26,6 +26,7 @@ pub async fn run(env: Env) -> Result<(), AppError> {
                 .delete(handlers::remove_agent),
         )
         .route("/agent/{uuid}/tool", post(handlers::tool_control))
+        .route("/agent/{uuid}/messages", get(handlers::get_messages))
         .route("/all", get(handlers::list_agent))
         .route("/create", get(handlers::create_agent))
         .layer(CorsLayer::permissive())

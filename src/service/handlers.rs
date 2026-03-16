@@ -1,7 +1,7 @@
-use crate::entities::ApiResponse;
 use crate::entities::stream::Chunk;
+use crate::entities::{AgentTask, ApiResponse};
 use crate::error::AppError;
-use crate::error::AppError::{InternalError, NotFound};
+use crate::error::AppError::NotFound;
 use crate::service::AgentState;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive};
@@ -36,7 +36,7 @@ pub async fn input(
     Path(uuid): Path<Uuid>,
     body: String,
 ) -> Result<Json<ApiResponse<String>>, AppError> {
-    let message = match state.manager.input(&uuid, &body) {
+    let message = match state.manager.input(&uuid, &body).await {
         Ok(_) => "Message sent to agent",
         Err(_) => "Agent is not listening",
     };
@@ -92,10 +92,7 @@ pub async fn tool_control(
         return Err(NotFound(uuid.to_string()));
     };
     let approve = *body;
-    handle
-        .control_tx
-        .send(approve)
-        .map_err(|e| InternalError(format!("Failed to send tool control: {}", e)))?;
+    handle.control_tx.send(approve)?;
     Ok(Json(ApiResponse::ok(())))
 }
 
@@ -108,4 +105,24 @@ pub async fn remove_agent(
     state.manager.remove(uuid).await?;
 
     Ok(Json(ApiResponse::ok(())))
+}
+
+pub async fn get_messages(
+    State(state): State<Arc<AgentState>>,
+    Path(uuid): Path<Uuid>,
+) -> Result<Json<ApiResponse<Chunk>>, AppError> {
+    let state = Arc::clone(&state);
+    let Some(t) = state.manager.handles.get(&uuid) else {
+        return Err(NotFound(uuid.to_string()));
+    };
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<Chunk>();
+
+    t.input_tx
+        .send(AgentTask::MessageRequest { channel: tx })
+        .await?;
+
+    let result = rx.await?;
+
+    Ok(Json(ApiResponse::ok(result)))
 }

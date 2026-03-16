@@ -1,4 +1,4 @@
-use crate::entities::{CallFunction, Choice, FinishReason, Message, Response, ToolCall, Usage};
+use crate::entities::{CallFunction, Choice, FinishReason, MarkedMessage, Message, Response, ToolCall, Usage};
 use crate::error::AppError;
 use crate::error::AppError::InternalError;
 use serde::{Deserialize, Serialize};
@@ -203,6 +203,9 @@ pub enum Chunk {
     ToolCall {
         name: String,
         arguments: String,
+    },
+    Messages {
+        messages: Vec<MarkedMessage>,
     },
     ToolOutput {
         stdout: String,

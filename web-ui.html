@@ -519,8 +519,11 @@
         // API functions
         async function fetchAgents() {
             try {
+                console.log('Fetching agents from', `${API_BASE}/all`);
                 const response = await fetch(`${API_BASE}/all`);
+                console.log('Fetch agents response status:', response.status);
                 const data = await response.json();
+                console.log('Fetch agents data:', data);
                 if (data.ok) {
                     agents = data.result;
                     renderAgentList();
@@ -533,10 +536,15 @@
         }
 
         async function createAgent() {
+            console.log('Create agent button clicked');
             try {
+                console.log('Sending request to', `${API_BASE}/create`);
                 const response = await fetch(`${API_BASE}/create`);
+                console.log('Response status:', response.status);
                 const data = await response.json();
+                console.log('Response data:', data);
                 if (data.ok) {
+                    console.log('Agent created:', data.result);
                     agents.push(data.result);
                     renderAgentList();
                     selectAgent(data.result);
@@ -546,7 +554,7 @@
                 }
             } catch (error) {
                 console.error('Failed to create agent:', error);
-                alert('Failed to create agent');
+                alert('Failed to create agent: ' + error.message);
             }
         }
 
@@ -638,6 +646,7 @@
             showChatContainer();
             document.getElementById('agentIdDisplay').textContent = uuid;
             document.getElementById('chatMessages').innerHTML = '';
+            fetchMessages(uuid);
             connectEventSource(uuid);
         }
 
@@ -786,19 +795,35 @@
 
         function handleChunk(chunk) {
             switch (chunk.type) {
-                case 'block':
-                    addSystemMessage(`Blocked: ${chunk.reason} - ${chunk.content}`);
+                case 'block': {
+                    // For batch mode: reason contains reasoning, content contains assistant message
+                    const container = document.getElementById('chatMessages');
+                    if (chunk.reason && chunk.reason.trim() !== '') {
+                        // Show reasoning as a static reasoning block
+                        let reasoningDiv = document.createElement('div');
+                        reasoningDiv.className = 'reasoning';
+                        reasoningDiv.innerHTML = `<strong>Thinking...</strong><br>${escapeHtml(chunk.reason)}`;
+                        container.appendChild(reasoningDiv);
+                    }
+                    if (chunk.content && chunk.content.trim() !== '') {
+                        // Show assistant message directly
+                        addMessage('assistant', chunk.content);
+                    }
+                    container.scrollTop = container.scrollHeight;
                     break;
+                }
 
-                case 'tool_call':
+                case 'tool_call': {
                     addToolCallElement(chunk.name, chunk.arguments);
                     break;
+                }
 
-                case 'tool_output':
+                case 'tool_output': {
                     addToolOutputElement(chunk.stdout, chunk.stderr, chunk.status);
                     break;
+                }
 
-                case 'reason_chunk':
+                case 'reason_chunk': {
                     const container = document.getElementById('chatMessages');
                     let reasoningDiv = container.querySelector('.reasoning:last-child');
 
@@ -813,8 +838,9 @@
                     reasoningDiv.innerHTML = `<strong>Thinking...</strong><br>${escapeHtml(currentReasoning)}`;
                     container.scrollTop = container.scrollHeight;
                     break;
+                }
 
-                case 'content_chunk':
+                case 'content_chunk': {
                     // Finalize reasoning
                     const container2 = document.getElementById('chatMessages');
                     const activeReasoning = container2.querySelector('.active-reasoning');
@@ -825,6 +851,39 @@
                     currentAssistantMessage += chunk.content;
                     updateLastAssistantMessage();
                     break;
+                }
+
+                case 'messages': {
+                    // Handle history messages
+                    if (chunk.messages && Array.isArray(chunk.messages)) {
+                        chunk.messages.forEach(msg => {
+                            // msg is already a Message due to transparent serialization
+                            if (msg.role === 'system') {
+                                addSystemMessage(msg.content);
+                            } else if (msg.role === 'user') {
+                                addMessage('user', msg.content);
+                            } else if (msg.role === 'assistant') {
+                                // Assistant message may have content and reasoning
+                                if (msg.reasoning_content) {
+                                    // Show reasoning
+                                    const container = document.getElementById('chatMessages');
+                                    let reasoningDiv = document.createElement('div');
+                                    reasoningDiv.className = 'reasoning';
+                                    reasoningDiv.innerHTML = `<strong>Thinking...</strong><br>${escapeHtml(msg.reasoning_content)}`;
+                                    container.appendChild(reasoningDiv);
+                                }
+                                if (msg.content) {
+                                    addMessage('assistant', msg.content);
+                                }
+                                // TODO: handle tool_calls if needed
+                            } else if (msg.role === 'tool') {
+                                // Tool messages might be displayed differently
+                                addSystemMessage(`Tool (${msg.tool_call_id}): ${msg.content}`);
+                            }
+                        });
+                    }
+                    break;
+                }
             }
         }
 
@@ -848,6 +907,21 @@
             chatInput.style.height = 'auto';
             chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
         });
+
+        async function fetchMessages(uuid) {
+            try {
+                const response = await fetch(`${API_BASE}/agent/${uuid}/messages`);
+                const data = await response.json();
+                if (data.ok) {
+                    // The result is a Chunk of type 'messages'
+                    handleChunk(data.result);
+                } else {
+                    console.error('Failed to fetch messages:', data.result);
+                }
+            } catch (error) {
+                console.error('Failed to fetch messages:', error);
+            }
+        }
 
         // Initialize
         fetchAgents();

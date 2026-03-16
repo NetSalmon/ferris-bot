@@ -3,13 +3,13 @@ use crate::agent::Agent;
 use crate::client::Client;
 use crate::entities::runtime::Env;
 use crate::entities::stream::Chunk;
-use crate::entities::{Message, Request};
+use crate::entities::{AgentTask, Message, Request};
 use crate::error::AppError;
 use crate::tools::control::ToolControl;
 use crate::tools::{Tool, bash, cat, grep, ls, sed, tail};
 use dashmap::DashMap;
 use std::sync::Arc;
-use tokio::sync::broadcast::{Sender, Receiver};
+use tokio::sync::broadcast::{Receiver, Sender};
 use uuid::Uuid;
 
 pub struct AgentManager {
@@ -18,10 +18,10 @@ pub struct AgentManager {
 }
 
 pub struct ServerHandle {
-    pub input_tx: Sender<String>,
     pub output_tx: Sender<Chunk>,
+    pub input_tx: tokio::sync::mpsc::Sender<AgentTask>,
     pub control_tx: Sender<bool>,
-    pub _input_rx: Receiver<String>,
+
     pub _output_rx: Receiver<Chunk>,
     pub _control_rx: Receiver<bool>,
 }
@@ -41,13 +41,15 @@ impl AgentManager {
         }
     }
 
-    pub fn input(&self, uuid: &Uuid, body: &str) -> Result<(), AppError> {
+    pub async fn input(&self, uuid: &Uuid, body: &str) -> Result<(), AppError> {
         let handle = self
             .handles
             .get(uuid)
             .ok_or(AppError::NotFound(uuid.to_string()))?;
 
-        handle.input_tx.send(body.to_string())?;
+        handle.input_tx.send(
+            AgentTask::Input{ content: body.to_string() }
+        ).await?;
 
         Ok(())
     }
@@ -55,7 +57,7 @@ impl AgentManager {
     pub async fn create(&self) -> Result<Uuid, AppError> {
         let (output_tx, _output_rx) = tokio::sync::broadcast::channel::<Chunk>(1024);
         let (control_tx, _control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
-        let (input_tx, _input_rx) = tokio::sync::broadcast::channel::<String>(1024);
+        let (input_tx, _input_rx) = tokio::sync::mpsc::channel::<AgentTask>(1024);
 
         let mut tool_control = ToolControl::new(control_tx.clone(), output_tx.clone());
         tool_control.add_tools(&[
@@ -90,7 +92,7 @@ impl AgentManager {
             client,
             request,
             output_tx.clone(),
-            input_tx.clone(),
+            _input_rx,
             tool_control,
         );
 
@@ -99,7 +101,6 @@ impl AgentManager {
             output_tx: output_tx.clone(),
             control_tx: control_tx.clone(),
             _control_rx,
-            _input_rx,
             _output_rx,
         };
 
@@ -127,7 +128,7 @@ impl AgentManager {
         };
 
         println!("Agent removing {}", uuid);
-        let _ = handle.input_tx.send(EXIT.to_string());
+        let _ = handle.input_tx.send(AgentTask::Input {content: EXIT.to_string()} );
         println!("Agent removed");
         Ok(())
     }
