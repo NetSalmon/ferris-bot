@@ -11,7 +11,7 @@ impl Tool for Cat {
         Cat {}
     }
 
-    fn call(&self, arguments: &str) -> Result<String, AppError> {
+    fn call(&self, arguments: &str) -> Result<Output, AppError> {
         let arguments: Vec<String> = serde_json::from_str::<Args>(arguments)?.args;
         let out = Command::new("cat").args(arguments).output()?;
 
@@ -21,7 +21,7 @@ impl Tool for Cat {
             status: out.status.code(),
         };
 
-        Ok(serde_json::to_string(&output)?)
+        Ok(output)
     }
 
     fn name(&self) -> String {

@@ -4,6 +4,22 @@ pub mod stream;
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Debug)]
+pub struct ApiResponse<T> {
+    pub ok: bool,
+    pub result: T,
+}
+
+impl<T> ApiResponse<T> {
+    pub fn ok(result: T) -> Self {
+        Self { ok: true, result }
+    }
+
+    pub fn err(result: T) -> Self {
+        Self { ok: false, result }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Request {
     pub model: String,
@@ -22,12 +38,24 @@ pub struct Request {
     enable_thinking: Option<bool>,
 }
 
+impl Request {
+    pub fn get_all_messages(&self) -> Vec<Message> {
+        self.messages.iter().map(|m| m.to_message()).collect()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(transparent)]
-struct MarkedMessage {
+pub struct MarkedMessage {
     #[serde(skip)]
     id: usize,
     message: Message,
+}
+
+impl MarkedMessage {
+    pub fn to_message(&self) -> Message {
+        self.message.clone()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

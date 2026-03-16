@@ -11,7 +11,7 @@ impl Tool for Bash {
         Self {}
     }
 
-    fn call(&self, arguments: &str) -> Result<String, AppError> {
+    fn call(&self, arguments: &str) -> Result<Output, AppError> {
         let args = serde_json::from_str::<Value>(arguments)?;
         let script = args["script"].as_str().unwrap_or("echo \"ERROR\"");
 
@@ -22,10 +22,6 @@ impl Tool for Bash {
             stderr: String::from_utf8(output.stderr)?,
             status: output.status.code(),
         };
-
-        let output = serde_json::to_string(&output)?;
-
-        println!("{}", output);
 
         Ok(output)
     }

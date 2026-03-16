@@ -1,3 +1,5 @@
+use crate::entities::ApiResponse;
+use crate::entities::stream::Chunk;
 use axum::Error as AxumError;
 use axum::http::Error as HttpError;
 use axum::http::{HeaderValue, StatusCode};
@@ -5,7 +7,6 @@ use axum::response::IntoResponse;
 use axum::response::Json;
 use reqwest::Error as ReqwestError;
 use reqwest::header::InvalidHeaderValue;
-use serde::Serialize;
 use serde_json::Error as SerdeJsonError;
 use std::env::VarError;
 use std::io::Error as IoError;
@@ -49,12 +50,8 @@ pub enum AppError {
     NoSuchToolError(String),
     #[error("Use disallow this action: {0}")]
     NoApprovementActionError(String),
-}
-
-#[derive(Serialize)]
-struct ErrorResponse {
-    error: String,
-    message: String,
+    #[error("Chunk send error: {0}")]
+    ChunkSendError(#[from] SendError<Chunk>),
 }
 
 impl IntoResponse for AppError {
@@ -65,9 +62,9 @@ impl IntoResponse for AppError {
             | AppError::JSONError(_)
             | AppError::Utf8Error(_) => (StatusCode::BAD_REQUEST, self.to_string()),
 
-            AppError::NotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
-
-            AppError::NoSuchToolError(_) => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::NotFound(_) | AppError::NoSuchToolError(_) => {
+                (StatusCode::NOT_FOUND, self.to_string())
+            }
 
             AppError::NoApprovementActionError(_) => (StatusCode::FORBIDDEN, self.to_string()),
 
@@ -79,13 +76,11 @@ impl IntoResponse for AppError {
             | AppError::JoinError(_)
             | AppError::AxumError(_)
             | AppError::HttpError(_)
+            | AppError::ChunkSendError(_)
             | AppError::EnvError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
-        let body = Json(ErrorResponse {
-            error: status_code.to_string(),
-            message: error_message,
-        });
+        let body = Json(ApiResponse::err(error_message));
 
         (
             status_code,

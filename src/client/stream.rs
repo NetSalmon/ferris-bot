@@ -1,5 +1,5 @@
 use crate::client::Client;
-use crate::entities::stream::ResponseBuffer;
+use crate::entities::stream::{Chunk, ResponseBuffer};
 use crate::entities::{Request, Response};
 use crate::error::AppError;
 use crate::error::AppError::InternalError;
@@ -9,8 +9,7 @@ use tokio::sync::broadcast::Sender;
 pub trait StreamAPI {
     async fn send(
         &mut self,
-        content: &Sender<String>,
-        reason: &Sender<String>,
+        output: &Sender<Chunk>,
         request: &Request,
     ) -> Result<Response, AppError>;
 }
@@ -18,8 +17,7 @@ pub trait StreamAPI {
 impl StreamAPI for Client {
     async fn send(
         &mut self,
-        content: &Sender<String>,
-        reason: &Sender<String>,
+        output: &Sender<Chunk>,
         request: &Request,
     ) -> Result<Response, AppError> {
         let mut stream = self
@@ -51,6 +49,10 @@ impl StreamAPI for Client {
                             return Err(InternalError("No data".to_string()));
                         };
 
+                        let chunk = Chunk::EventEnd;
+
+                        output.send(chunk)?;
+
                         return result.export();
                     }
 
@@ -70,10 +72,16 @@ impl StreamAPI for Client {
                             );
 
                             if !got_content.is_empty() {
-                                content.send(got_content)?;
+                                let chunk = Chunk::ContentChunk {
+                                    content: got_content,
+                                };
+                                output.send(chunk)?;
                             }
                             if !got_reason.is_empty() {
-                                reason.send(got_reason)?;
+                                let chunk = Chunk::ReasonChunk {
+                                    content: got_reason,
+                                };
+                                output.send(chunk)?;
                             }
 
                             if let Some(res) = &mut result {

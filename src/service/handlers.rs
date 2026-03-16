@@ -1,43 +1,47 @@
+use crate::entities::ApiResponse;
+use crate::entities::stream::Chunk;
 use crate::error::AppError;
 use crate::error::AppError::{InternalError, NotFound};
 use crate::service::AgentState;
-use crate::tools::control::ToolContent;
 use axum::extract::{Path, State};
-use axum::response::Sse;
 use axum::response::sse::{Event, KeepAlive};
+use axum::response::{Json, Sse};
 use futures_util::Stream;
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::broadcast::error::RecvError;
 use uuid::Uuid;
 
-pub async fn list_agent(State(state): State<Arc<AgentState>>) -> Result<String, AppError> {
-    let result = serde_json::to_string(
-        &state
-            .manager
-            .handles
-            .iter()
-            .map(|entry| *entry.key())
-            .collect::<Vec<_>>(),
-    )?;
-    Ok(result)
+pub async fn list_agent(
+    State(state): State<Arc<AgentState>>,
+) -> Result<Json<ApiResponse<Vec<Uuid>>>, AppError> {
+    let result = state
+        .manager
+        .handles
+        .iter()
+        .map(|entry| *entry.key())
+        .collect::<Vec<_>>();
+    Ok(Json(ApiResponse::ok(result)))
 }
 
-pub async fn create_agent(State(state): State<Arc<AgentState>>) -> Result<String, AppError> {
+pub async fn create_agent(
+    State(state): State<Arc<AgentState>>,
+) -> Result<Json<ApiResponse<String>>, AppError> {
     let uuid = state.manager.create().await?;
-    Ok(uuid.to_string())
+    Ok(Json(ApiResponse::ok(uuid.to_string())))
 }
 
 pub async fn input(
     State(state): State<Arc<AgentState>>,
     Path(uuid): Path<Uuid>,
     body: String,
-) -> String {
-    match state.manager.input(&uuid, &body) {
-        Ok(_) => "Message sent to agent".to_string(),
-        Err(_) => "Agent is not listening".to_string(),
-    }
+) -> Result<Json<ApiResponse<String>>, AppError> {
+    let message = match state.manager.input(&uuid, &body) {
+        Ok(_) => "Message sent to agent",
+        Err(_) => "Agent is not listening",
+    };
+
+    Ok(Json(ApiResponse::ok(message.to_string())))
 }
 
 pub async fn content(
@@ -47,25 +51,25 @@ pub async fn content(
     let Some(handle) = state.manager.handles.get(&uuid) else {
         return Err(NotFound(uuid.to_string()));
     };
-    let mut c_rx = handle.agent_handle.content_tx.subscribe();
-    let mut r_rx = handle.agent_handle.reason_tx.subscribe();
-    // Release the DashMap lock before entering the stream
+    let mut o_rx = handle.output_tx.subscribe();
 
     let stream = async_stream::stream! {
         loop {
-            let res = tokio::select! {
-                res = r_rx.recv() => Some(("reason", res)),
-                res = c_rx.recv() => Some(("content", res)),
-                _ = tokio::time::sleep(Duration::from_secs(30)) => None,
+            let Ok(res) = o_rx.recv().await else {
+                continue;
             };
 
-            match res {
-                Some((event_type, Ok(data))) => {
-                    yield Ok(Event::default().event(event_type).data(data));
-                }
-                Some((_, Err(RecvError::Lagged(_)))) => continue,
-                _ => break,
-            }
+            let body = match res {
+                Chunk::EventEnd => "[DONE]".to_string(),
+                _ => {
+                    let Ok(ret) = serde_json::to_string(&res) else {
+                        continue;
+                    };
+                    ret
+                },
+            };
+
+            yield Ok(Event::default().event("data").data(body));
         }
     };
 
@@ -76,71 +80,30 @@ pub async fn content(
     ))
 }
 
-pub async fn tool_output(
-    State(state): State<Arc<AgentState>>,
-    Path(uuid): Path<Uuid>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let Some(handle) = state.manager.handles.get(&uuid) else {
-        return Err(NotFound(uuid.to_string()));
-    };
-    let mut output_rx = handle.tool_handle.output_tx.subscribe();
-    // Release the DashMap lock before entering the stream
-
-    let stream = async_stream::stream! {
-        loop {
-            match output_rx.recv().await {
-                Ok(result) => {
-                    let event_type = match result {
-                        ToolContent::Output(_) => "output",
-                        ToolContent::Calling{..} => "calling"
-                    };
-
-                    let Ok(result) = serde_json::to_string(&result) else {
-                        continue;
-                    };
-
-                    yield Ok(Event::default().event(event_type).data(result))
-                }
-                Err(RecvError::Lagged(_)) => continue,
-                Err(_) => break,
-            }
-        }
-    };
-
-    let sse = Sse::new(stream).keep_alive(
-        KeepAlive::new()
-            .interval(Duration::from_secs(15))
-            .text("keep-alive"),
-    );
-
-    Ok(sse)
-}
-
 pub async fn tool_control(
     State(state): State<Arc<AgentState>>,
     Path(uuid): Path<Uuid>,
-    body: axum::Json<bool>,
-) -> Result<(), AppError> {
+    body: Json<bool>,
+) -> Result<Json<ApiResponse<()>>, AppError> {
     let state = Arc::clone(&state);
     let Some(handle) = state.manager.handles.get(&uuid) else {
         return Err(NotFound(uuid.to_string()));
     };
     let approve = *body;
     handle
-        .tool_handle
         .control_tx
         .send(approve)
         .map_err(|e| InternalError(format!("Failed to send tool control: {}", e)))?;
-    Ok(())
+    Ok(Json(ApiResponse::ok(())))
 }
 
 pub async fn remove_agent(
     State(state): State<Arc<AgentState>>,
     Path(uuid): Path<Uuid>,
-) -> Result<(), AppError> {
+) -> Result<Json<ApiResponse<()>>, AppError> {
     println!("Receive remove request {}", uuid.to_string());
     let state = Arc::clone(&state);
     state.manager.remove(uuid).await?;
 
-    Ok(())
+    Ok(Json(ApiResponse::ok(())))
 }

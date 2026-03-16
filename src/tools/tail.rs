@@ -11,7 +11,7 @@ impl Tool for Tail {
         Tail {}
     }
 
-    fn call(&self, arguments: &str) -> Result<String, AppError> {
+    fn call(&self, arguments: &str) -> Result<Output, AppError> {
         // 解析传入的参数数组
         let arguments: Vec<String> = serde_json::from_str::<Args>(arguments)?.args;
         let out = Command::new("tail").args(arguments).output()?;
@@ -23,7 +23,7 @@ impl Tool for Tail {
             status: out.status.code(),
         };
 
-        Ok(serde_json::to_string(&output)?)
+        Ok(output)
     }
 
     fn name(&self) -> String {

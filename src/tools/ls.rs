@@ -11,7 +11,7 @@ impl Tool for Ls {
         Self {}
     }
 
-    fn call(&self, arguments: &str) -> Result<String, AppError> {
+    fn call(&self, arguments: &str) -> Result<Output, AppError> {
         let args: Vec<String> = serde_json::from_str::<Args>(arguments)?.args;
         let output = Command::new("ls").args(args).output()?;
 
@@ -21,7 +21,7 @@ impl Tool for Ls {
             status: output.status.code(),
         };
 
-        Ok(serde_json::to_string(&output)?)
+        Ok(output)
     }
 
     fn name(&self) -> String {
@@ -46,15 +46,5 @@ impl Tool for Ls {
             },
             "required": ["args"]
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_ls() {
-        let ls = Ls::new();
-        println!("{}", ls.call(r#"["/tmp"]"#).unwrap());
     }
 }

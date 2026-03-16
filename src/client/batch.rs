@@ -1,4 +1,5 @@
 use crate::client::Client;
+use crate::entities::stream::Chunk;
 use crate::entities::{Message, Request, Response};
 use crate::error::AppError;
 use tokio::sync::broadcast::Sender;
@@ -6,8 +7,7 @@ use tokio::sync::broadcast::Sender;
 pub trait BatchAPI {
     async fn send(
         &mut self,
-        content: &Sender<String>,
-        reason: &Sender<String>,
+        output: &Sender<Chunk>,
         request: &Request,
     ) -> Result<Response, AppError>;
 }
@@ -15,8 +15,7 @@ pub trait BatchAPI {
 impl BatchAPI for Client {
     async fn send(
         &mut self,
-        content: &Sender<String>,
-        reason: &Sender<String>,
+        output: &Sender<Chunk>,
         request: &Request,
     ) -> Result<Response, AppError> {
         if let Ok(json) = serde_json::to_string_pretty(&request) {
@@ -53,8 +52,12 @@ impl BatchAPI for Client {
             },
         );
 
-        content.send(got_content)?;
-        reason.send(got_reason)?;
+        let chunk = Chunk::Block {
+            reason: got_reason,
+            content: got_content,
+        };
+
+        output.send(chunk)?;
 
         Ok(result)
     }

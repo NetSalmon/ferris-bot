@@ -1,7 +1,7 @@
+use crate::entities::stream::Chunk;
 use crate::entities::{FunctionDetail, Message};
 use crate::error::AppError;
 use crate::tools::Tool;
-use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast::{Receiver, Sender};
@@ -10,44 +10,21 @@ pub struct ToolControl {
     pub tools: Vec<Arc<dyn Tool>>,
     pub tool_entities: Vec<crate::entities::Tool>,
     pub tool_router: HashMap<String, Arc<dyn Tool>>,
-    pub control_tx: Sender<bool>,
-    pub output_tx: Sender<ToolContent>,
+    pub output_tx: Sender<Chunk>,
     pub control_rx: Receiver<bool>,
 }
 
-pub struct ToolHandle {
-    pub control_tx: Sender<bool>,
-    pub output_tx: Sender<ToolContent>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(tag = "type")]
-#[serde(rename_all = "lowercase")]
-pub enum ToolContent {
-    Calling { name: String, arguments: String },
-    Output(String),
-}
-
 impl ToolControl {
-    pub fn new() -> (Self, ToolHandle) {
-        let (control_tx, _control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
-        let (output_tx, _output_rx) = tokio::sync::broadcast::channel::<ToolContent>(1024);
-
+    pub fn new(control_tx: Sender<bool>, output_tx: Sender<Chunk>) -> Self {
         let control = Self {
             tools: vec![],
             tool_entities: vec![],
             tool_router: HashMap::new(),
-            control_tx: control_tx.clone(),
-            output_tx: output_tx.clone(),
+            output_tx,
             control_rx: control_tx.subscribe(),
         };
 
-        let handle = ToolHandle {
-            control_tx,
-            output_tx,
-        };
-
-        (control, handle)
+        control
     }
 
     pub fn add_tool(&mut self, tool: Arc<dyn Tool>) {
@@ -78,7 +55,7 @@ impl ToolControl {
         arguments: &str,
         id: &str,
     ) -> Result<Message, AppError> {
-        let content = ToolContent::Calling {
+        let content = Chunk::ToolCall {
             name: name.to_string(),
             arguments: arguments.to_string(),
         };
@@ -96,13 +73,21 @@ impl ToolControl {
 
             let result = tool.call(arguments)?;
 
+            let string = serde_json::to_string(&result)?;
+
+            let chunk = Chunk::ToolOutput {
+                stdout: result.stdout,
+                stderr: result.stderr,
+                status: result.status,
+            };
+
             self.output_tx
-                .send(ToolContent::Output(result.clone()))
+                .send(chunk)
                 .map_err(|err| AppError::InternalError(err.to_string()))?;
 
             let msg = Message::Tool {
                 tool_call_id: id.to_string(),
-                content: result,
+                content: string,
             };
 
             Ok(msg)

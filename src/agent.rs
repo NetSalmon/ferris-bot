@@ -1,49 +1,34 @@
 use crate::EXIT;
 use crate::client::Client;
+use crate::entities::stream::Chunk;
 use crate::entities::{Message, Request};
 use crate::error::AppError;
 use crate::tools::control::ToolControl;
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::broadcast::Sender;
 
 pub struct Agent {
     client: Client,
     request: Request,
-    content_tx: Sender<String>,
-    reason_tx: Sender<String>,
+    output_tx: Sender<Chunk>,
     input_tx: Sender<String>,
     tool_control: ToolControl,
-    _keep_alive_c: Receiver<String>,
-    _keep_alive_r: Receiver<String>,
-    _keep_alive_i: Receiver<String>,
-}
-
-pub struct AgentHandle {
-    pub input_tx: Sender<String>,
-    pub content_tx: Sender<String>,
-    pub reason_tx: Sender<String>,
 }
 
 impl Agent {
     pub fn new(
         client: Client,
         request: Request,
+        output_tx: Sender<Chunk>,
+        input_tx: Sender<String>,
         tool_control: ToolControl,
-    ) -> (Agent, AgentHandle) {
-        let (content_tx, content_rx) = tokio::sync::broadcast::channel(1024);
-        let (reason_tx, reason_rx) = tokio::sync::broadcast::channel(1024);
-        let (input_tx, input_rx) = tokio::sync::broadcast::channel(1024);
-
+    ) -> Agent {
         let tools = tool_control.tool_entities.clone();
 
         let mut agent = Agent {
             client,
             request,
-            content_tx: content_tx.clone(),
-            reason_tx: reason_tx.clone(),
+            output_tx: output_tx.clone(),
             input_tx: input_tx.clone(),
-            _keep_alive_c: content_rx,
-            _keep_alive_r: reason_rx,
-            _keep_alive_i: input_rx,
             tool_control,
         };
 
@@ -58,19 +43,7 @@ impl Agent {
             }
         }
 
-        let handle = AgentHandle {
-            input_tx,
-            content_tx,
-            reason_tx,
-        };
-
-        (agent, handle)
-    }
-
-    pub async fn kill(&self, input_tx: Sender<String>) -> Result<(), AppError> {
-        input_tx.send(EXIT.to_string())?;
-
-        Ok(())
+        agent
     }
 
     pub async fn run(&mut self) -> Result<(), AppError> {
@@ -96,22 +69,10 @@ impl Agent {
 
             let response = if self.request.stream == Some(true) {
                 use crate::client::stream::StreamAPI;
-                StreamAPI::send(
-                    &mut self.client,
-                    &self.content_tx,
-                    &self.reason_tx,
-                    &self.request,
-                )
-                .await?
+                StreamAPI::send(&mut self.client, &self.output_tx, &self.request).await?
             } else {
                 use crate::client::batch::BatchAPI;
-                BatchAPI::send(
-                    &mut self.client,
-                    &self.content_tx,
-                    &self.reason_tx,
-                    &self.request,
-                )
-                .await?
+                BatchAPI::send(&mut self.client, &self.output_tx, &self.request).await?
             };
 
             for choice in &response.choices {

@@ -192,15 +192,29 @@ impl ResponseBuffer {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
-#[serde(rename_all = "lowercase")]
-pub enum DAOChunk {
-    Reason {
-        content: String
-    },
-    Content {
+#[serde(rename_all = "snake_case")]
+pub enum Chunk {
+    Block {
+        reason: String,
         content: String,
     },
-    End,
+    ToolCall {
+        name: String,
+        arguments: String,
+    },
+    ToolOutput {
+        stdout: String,
+        stderr: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        status: Option<i32>,
+    },
+    ReasonChunk {
+        content: String,
+    },
+    ContentChunk {
+        content: String,
+    },
+    EventEnd,
 }

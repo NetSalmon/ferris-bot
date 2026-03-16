@@ -1,13 +1,15 @@
 use crate::EXIT;
-use crate::agent::{Agent, AgentHandle};
+use crate::agent::Agent;
 use crate::client::Client;
 use crate::entities::runtime::Env;
+use crate::entities::stream::Chunk;
 use crate::entities::{Message, Request};
 use crate::error::AppError;
-use crate::tools::control::{ToolControl, ToolHandle};
-use crate::tools::{Tool, bash, cat, get_weather, grep, ls, sed, tail};
+use crate::tools::control::ToolControl;
+use crate::tools::{Tool, bash, cat, grep, ls, sed, tail};
 use dashmap::DashMap;
 use std::sync::Arc;
+use tokio::sync::broadcast::Sender;
 use uuid::Uuid;
 
 pub struct AgentManager {
@@ -16,8 +18,9 @@ pub struct AgentManager {
 }
 
 pub struct ServerHandle {
-    pub agent_handle: AgentHandle,
-    pub tool_handle: ToolHandle,
+    pub input_tx: Sender<String>,
+    pub output_tx: Sender<Chunk>,
+    pub control_tx: Sender<bool>,
 }
 
 impl AgentManager {
@@ -41,16 +44,19 @@ impl AgentManager {
             .get(uuid)
             .ok_or(AppError::NotFound(uuid.to_string()))?;
 
-        handle.agent_handle.input_tx.send(body.to_string())?;
+        handle.input_tx.send(body.to_string())?;
 
         Ok(())
     }
 
     pub async fn create(&self) -> Result<Uuid, AppError> {
-        let (mut tool_control, tool_handle) = ToolControl::new();
+        let (output_tx, _output_rx) = tokio::sync::broadcast::channel::<Chunk>(1024);
+        let (control_tx, _control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
+        let (input_tx, _input_rx) = tokio::sync::broadcast::channel::<String>(1024);
+
+        let mut tool_control = ToolControl::new(control_tx.clone(), output_tx.clone());
         tool_control.add_tools(&[
             Arc::new(bash::Bash::new()),
-            Arc::new(get_weather::GetWeather::new()),
             Arc::new(ls::Ls::new()),
             Arc::new(tail::Tail::new()),
             Arc::new(sed::Sed::new()),
@@ -77,11 +83,18 @@ impl AgentManager {
             .enable_thinking()
             .build();
 
-        let (mut agent, agent_handle) = Agent::new(client, request, tool_control);
+        let mut agent = Agent::new(
+            client,
+            request,
+            output_tx.clone(),
+            input_tx.clone(),
+            tool_control,
+        );
 
         let handle = ServerHandle {
-            agent_handle,
-            tool_handle,
+            input_tx: input_tx.clone(),
+            output_tx: output_tx.clone(),
+            control_tx: control_tx.clone(),
         };
 
         let uuid = Uuid::new_v4();
@@ -108,7 +121,7 @@ impl AgentManager {
         };
 
         println!("Agent removing {}", uuid);
-        let _ = handle.agent_handle.input_tx.send(EXIT.to_string());
+        let _ = handle.input_tx.send(EXIT.to_string());
         println!("Agent removed");
         Ok(())
     }
