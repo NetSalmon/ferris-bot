@@ -32,7 +32,7 @@ pub async fn run(env: Env) -> Result<(), AppError> {
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(state));
 
-    let addr = tokio::net::TcpListener::bind("0.0.0.0:11451").await?;
+    let addr = tokio::net::TcpListener::bind("127.0.0.1:11451").await?;
 
     axum::serve(addr, router).await?;
 

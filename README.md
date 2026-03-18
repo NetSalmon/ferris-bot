@@ -46,7 +46,7 @@
 
 1. 克隆仓库
 ```bash
-git clone https://github.com/NetSalmon/ferris-bot/tree/dev
+git clone <your-repo-url>
 cd ferris-bot
 ```
 
