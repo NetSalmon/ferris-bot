@@ -16,15 +16,15 @@
 
 ## 🔧 内置工具
 
-| 工具 | 描述 |
-|------|------|
-| `bash` | 执行Bash命令 |
-| `ls` | 列出目录内容 |
-| `cat` | 查看文件内容 |
-| `tail` | 查看文件尾部内容 |
-| `grep` | 文本搜索匹配 |
+| 工具 | 描述           |
+|------|--------------|
+| `bash` | 执行Bash命令     |
+| `ls` | 列出目录内容       |
+| `cat` | 查看文件内容       |
+| `tail` | 查看文件尾部内容     |
+| `grep` | 文本搜索匹配       |
 | `sed` | 流编辑器，文本替换/处理 |
-| `get_weather` | 获取天气信息 |
+| `get_weather` | 模拟获取天气信息     |
 
 ## 📦 技术栈
 
@@ -46,7 +46,7 @@
 
 1. 克隆仓库
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/NetSalmon/ferris-bot.git
 cd ferris-bot
 ```
 
@@ -67,7 +67,7 @@ FERRIS_BOT_MODEL=gpt-4
 cargo run
 ```
 
-服务将启动在 `http://0.0.0.0:11451`
+服务将启动在 `http://127.0.0.1:11451`
 
 ## 💡 多Agent架构
 
