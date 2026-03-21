@@ -1,4 +1,4 @@
-use crate::entities::stream::Chunk;
+use crate::entities::service::Chunk;
 use crate::entities::{FunctionDetail, Message};
 use crate::error::AppError;
 use crate::tools::Tool;

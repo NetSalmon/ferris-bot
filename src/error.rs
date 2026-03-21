@@ -1,12 +1,12 @@
-use crate::entities::stream::Chunk;
-use crate::entities::{AgentTask, ApiResponse};
+use crate::entities::AgentTask;
+use crate::entities::service::{ApiResponse, Chunk};
+use axum::Error as AxumError;
 use axum::http::Error as HttpError;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::response::Json;
-use axum::Error as AxumError;
-use reqwest::header::InvalidHeaderValue;
 use reqwest::Error as ReqwestError;
+use reqwest::header::InvalidHeaderValue;
 use serde_json::Error as SerdeJsonError;
 use std::env::VarError;
 use std::io::Error as IoError;
@@ -94,7 +94,9 @@ impl IntoResponse for AppError {
             | AppError::AgentTaskSendError(_)
             | AppError::OneshotRecvError(_)
             | AppError::EnvError(_)
-            | AppError::ToolControlSendError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            | AppError::ToolControlSendError(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
+            }
         };
 
         let body = Json(ApiResponse::err(error_message));

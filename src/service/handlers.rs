@@ -1,8 +1,10 @@
-use crate::entities::stream::Chunk;
-use crate::entities::{AgentTask, ApiResponse};
+use crate::entities::AgentTask;
+use crate::entities::service::Chunk;
+use crate::entities::service::{AgentSettings, ApiResponse};
 use crate::error::AppError;
 use crate::error::AppError::NotFound;
 use crate::service::AgentState;
+use crate::tools::TOOL_ROUTERS;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive};
 use axum::response::{Json, Sse};
@@ -26,8 +28,9 @@ pub async fn list_agent(
 
 pub async fn create_agent(
     State(state): State<Arc<AgentState>>,
+    Json(body): Json<AgentSettings>,
 ) -> Result<Json<ApiResponse<String>>, AppError> {
-    let uuid = state.manager.create().await?;
+    let uuid = state.manager.create(body).await?;
     Ok(Json(ApiResponse::ok(uuid.to_string())))
 }
 
@@ -125,4 +128,13 @@ pub async fn get_messages(
     let result = rx.await?;
 
     Ok(Json(ApiResponse::ok(result)))
+}
+
+pub async fn tools() -> Result<Json<ApiResponse<String>>, AppError> {
+    let Some(tools) = TOOL_ROUTERS.get() else {
+        return Ok(Json(ApiResponse::ok("[]".to_string())));
+    };
+
+    let keys = tools.keys().cloned().collect::<Vec<_>>();
+    Ok(Json(ApiResponse::ok(serde_json::to_string(&keys)?)))
 }

@@ -1,4 +1,4 @@
-use crate::entities::{CallFunction, Choice, FinishReason, MarkedMessage, Message, Response, ToolCall, Usage};
+use crate::entities::{CallFunction, Choice, FinishReason, Message, Response, ToolCall, Usage};
 use crate::error::AppError;
 use crate::error::AppError::InternalError;
 use serde::{Deserialize, Serialize};
@@ -190,34 +190,4 @@ impl ResponseBuffer {
 
         Ok(result)
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-pub enum Chunk {
-    Block {
-        reason: String,
-        content: String,
-    },
-    ToolCall {
-        name: String,
-        arguments: String,
-    },
-    Messages {
-        messages: Vec<MarkedMessage>,
-    },
-    ToolOutput {
-        stdout: String,
-        stderr: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        status: Option<i32>,
-    },
-    ReasonChunk {
-        content: String,
-    },
-    ContentChunk {
-        content: String,
-    },
-    EventEnd,
 }

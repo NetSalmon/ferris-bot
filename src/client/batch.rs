@@ -1,5 +1,5 @@
 use crate::client::Client;
-use crate::entities::stream::Chunk;
+use crate::entities::service::Chunk;
 use crate::entities::{Message, Request, Response};
 use crate::error::AppError;
 use tokio::sync::broadcast::Sender;
@@ -58,6 +58,7 @@ impl BatchAPI for Client {
         };
 
         output.send(chunk)?;
+        output.send(Chunk::EventEnd)?;
 
         Ok(result)
     }

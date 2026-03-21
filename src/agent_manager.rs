@@ -2,11 +2,12 @@ use crate::EXIT;
 use crate::agent::Agent;
 use crate::client::Client;
 use crate::entities::runtime::Env;
-use crate::entities::stream::Chunk;
-use crate::entities::{AgentTask, Message, Request};
+use crate::entities::service::AgentSettings;
+use crate::entities::service::Chunk;
+use crate::entities::{AgentTask, Request};
 use crate::error::AppError;
+use crate::tools::TOOL_ROUTERS;
 use crate::tools::control::ToolControl;
-use crate::tools::{Tool, bash, cat, grep, ls, sed, tail};
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast::{Receiver, Sender};
@@ -47,27 +48,36 @@ impl AgentManager {
             .get(uuid)
             .ok_or(AppError::NotFound(uuid.to_string()))?;
 
-        handle.input_tx.send(
-            AgentTask::Input{ content: body.to_string() }
-        ).await?;
+        handle
+            .input_tx
+            .send(AgentTask::Input {
+                content: body.to_string(),
+            })
+            .await?;
 
         Ok(())
     }
 
-    pub async fn create(&self) -> Result<Uuid, AppError> {
+    pub async fn create(&self, setting: AgentSettings) -> Result<Uuid, AppError> {
         let (output_tx, _output_rx) = tokio::sync::broadcast::channel::<Chunk>(1024);
         let (control_tx, _control_rx) = tokio::sync::broadcast::channel::<bool>(1024);
         let (input_tx, _input_rx) = tokio::sync::mpsc::channel::<AgentTask>(1024);
 
         let mut tool_control = ToolControl::new(control_tx.clone(), output_tx.clone());
-        tool_control.add_tools(&[
-            Arc::new(bash::Bash::new()),
-            Arc::new(ls::Ls::new()),
-            Arc::new(tail::Tail::new()),
-            Arc::new(sed::Sed::new()),
-            Arc::new(grep::Grep::new()),
-            Arc::new(cat::Cat::new()),
-        ]);
+
+        let mut dist_tools = vec![];
+        if let Some(tools) = &setting.tools {
+            if let Some(tool_routers) = TOOL_ROUTERS.get() {
+                for tool in tools {
+                    let Some(t) = tool_routers.get(tool) else {
+                        continue;
+                    };
+                    dist_tools.push(Arc::clone(t))
+                }
+            }
+        }
+
+        tool_control.add_tools(&dist_tools);
 
         let Some(env) = &self.env else {
             return Err(AppError::InternalError("No env provide".to_string()));
@@ -78,23 +88,9 @@ impl AgentManager {
             .set_api_key(&env.api_key)?
             .build()?;
 
-        let request = Request::builder()
-            .set_model(&env.model)
-            .push_message(Message::System {
-                content: "You are an helpful assistant".to_string(),
-                name: None,
-            })
-            .enable_stream()
-            .enable_thinking()
-            .build();
+        let request = Request::from(setting);
 
-        let mut agent = Agent::new(
-            client,
-            request,
-            output_tx.clone(),
-            _input_rx,
-            tool_control,
-        );
+        let mut agent = Agent::new(client, request, output_tx.clone(), _input_rx, tool_control);
 
         let handle = ServerHandle {
             input_tx: input_tx.clone(),
@@ -128,7 +124,9 @@ impl AgentManager {
         };
 
         println!("Agent removing {}", uuid);
-        let _ = handle.input_tx.send(AgentTask::Input {content: EXIT.to_string()} );
+        let _ = handle.input_tx.send(AgentTask::Input {
+            content: EXIT.to_string(),
+        });
         println!("Agent removed");
         Ok(())
     }

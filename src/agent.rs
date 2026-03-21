@@ -1,10 +1,10 @@
+use crate::EXIT;
 use crate::client::Client;
-use crate::entities::stream::Chunk;
-use crate::entities::stream::Chunk::Messages;
+use crate::entities::service::Chunk;
+use crate::entities::service::Chunk::Messages;
 use crate::entities::{AgentTask, Message, Request};
 use crate::error::AppError;
 use crate::tools::control::ToolControl;
-use crate::EXIT;
 use tokio::sync::broadcast::Sender;
 
 pub struct Agent {
@@ -51,24 +51,26 @@ impl Agent {
         let mut in_feedback = false;
 
         loop {
+            // 处理输入 如果在反馈循环就跳过
             if !in_feedback {
                 let input = loop {
                     let Some(input) = self.input_rx.recv().await else {
                         continue;
                     };
                     match input {
-                        AgentTask::Input {content} => {
+                        AgentTask::Input { content } => {
                             break content;
                         }
                         AgentTask::MessageRequest { channel } => {
                             let chunk = Messages {
                                 messages: self.request.messages.clone(),
                             };
-                            // 如果发送失败，说明接收端已关闭，忽略即可
+
                             let _ = channel.send(chunk);
                         }
                     }
                 };
+
                 if input.to_lowercase().trim() == EXIT {
                     break;
                 }

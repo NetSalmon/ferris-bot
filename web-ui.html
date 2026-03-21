@@ -72,6 +72,40 @@
             background: var(--accent-hover);
         }
 
+        .config-btn {
+            width: 100%;
+            padding: 10px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .config-btn:hover {
+            background: var(--border);
+            border-color: var(--accent);
+        }
+
+        .agent-config-btn {
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border: none;
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .agent-config-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
         .agent-list {
             flex: 1;
             overflow-y: auto;
@@ -450,6 +484,173 @@
         .message.assistant th {
             background: var(--bg-tertiary);
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .close-btn:hover {
+            background: rgba(233, 69, 96, 0.2);
+            color: var(--accent);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-btn.save {
+            background: var(--accent);
+            color: white;
+        }
+
+        .modal-btn.save:hover {
+            background: var(--accent-hover);
+        }
+
+        .modal-btn.cancel {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .modal-btn.cancel:hover {
+            background: var(--border);
+        }
+
+        .form-help {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .form-control[type="number"] {
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -486,6 +687,7 @@
                         rows="1"
                     ></textarea>
                 </div>
+                <button class="agent-config-btn" id="agentConfigBtn" onclick="openAgentConfig()">Configure Agent</button>
                 <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
             </div>
         </div>
@@ -502,6 +704,19 @@
         let currentAssistantMessage = '';
         let currentReasoning = '';
         let isWaitingForApproval = false;
+        // Configuration for each agent, keyed by agent ID
+        let agentConfigs = {};
+        // Current agent configuration (for editing in modal)
+        let agentConfig = {
+            model: "claude-3-haiku-20240307",
+            system_prompt: null,
+            temperature: null,
+            tools: null,
+            tool_choice: null,
+            stream: true,
+            thinking: null,
+            max_tokens: null
+        };
 
         // Marked configuration
         marked.setOptions({
@@ -515,6 +730,152 @@
             },
             breaks: true
         });
+
+        // Configuration functions
+        function loadConfig() {
+            // Try to load agent-specific configs
+            const savedConfigs = localStorage.getItem('ferris-bot-configs');
+            if (savedConfigs) {
+                try {
+                    agentConfigs = JSON.parse(savedConfigs);
+                    console.log('Loaded agent configs:', agentConfigs);
+                } catch (e) {
+                    console.error('Failed to parse saved agent configs:', e);
+                }
+            }
+            // Backward compatibility: load old global config as default
+            const savedGlobal = localStorage.getItem('ferris-bot-config');
+            if (savedGlobal && !savedConfigs) {
+                try {
+                    const parsed = JSON.parse(savedGlobal);
+                    // Use as default configuration for new agents
+                    agentConfig = { ...agentConfig, ...parsed };
+                    console.log('Loaded legacy global config:', agentConfig);
+                } catch (e) {
+                    console.error('Failed to parse legacy config:', e);
+                }
+            }
+        }
+
+        function saveConfigToStorage() {
+            try {
+                localStorage.setItem('ferris-bot-configs', JSON.stringify(agentConfigs));
+                console.log('Saved agent configs:', agentConfigs);
+            } catch (e) {
+                console.error('Failed to save agent configs:', e);
+            }
+        }
+
+        function openAgentConfig() {
+            if (!activeAgentId) {
+                alert('Please select an agent first');
+                return;
+            }
+            openConfigModal();
+        }
+
+        function openConfigModal() {
+            const modal = document.getElementById('configModal');
+            const form = document.getElementById('configForm');
+
+            // Fill form with current config
+            document.getElementById('model').value = agentConfig.model || '';
+            document.getElementById('system_prompt').value = agentConfig.system_prompt || '';
+            document.getElementById('temperature').value = agentConfig.temperature !== null && agentConfig.temperature !== undefined ? agentConfig.temperature : '';
+            document.getElementById('max_tokens').value = agentConfig.max_tokens !== null && agentConfig.max_tokens !== undefined ? agentConfig.max_tokens : '';
+
+            // Handle tools array
+            if (Array.isArray(agentConfig.tools)) {
+                document.getElementById('tools').value = agentConfig.tools.join(', ');
+            } else {
+                document.getElementById('tools').value = '';
+            }
+
+            document.getElementById('tool_choice').value = agentConfig.tool_choice || '';
+            document.getElementById('stream').checked = agentConfig.stream !== false;
+            document.getElementById('thinking').checked = agentConfig.thinking === true;
+
+            modal.classList.add('active');
+
+            // Add event listeners for closing
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    closeConfigModal();
+                }
+            };
+
+            const handleClickOutside = (e) => {
+                if (e.target === modal) {
+                    closeConfigModal();
+                }
+            };
+
+            document.addEventListener('keydown', handleEscape);
+            modal.addEventListener('click', handleClickOutside);
+
+            // Store handlers for cleanup
+            modal._handleEscape = handleEscape;
+            modal._handleClickOutside = handleClickOutside;
+        }
+
+        function closeConfigModal() {
+            const modal = document.getElementById('configModal');
+            modal.classList.remove('active');
+
+            // Remove event listeners
+            if (modal._handleEscape) {
+                document.removeEventListener('keydown', modal._handleEscape);
+                delete modal._handleEscape;
+            }
+            if (modal._handleClickOutside) {
+                modal.removeEventListener('click', modal._handleClickOutside);
+                delete modal._handleClickOutside;
+            }
+        }
+
+        function saveConfig() {
+            if (!activeAgentId) {
+                alert('No active agent selected');
+                return;
+            }
+            // Parse form values
+            const model = document.getElementById('model').value.trim();
+            const system_prompt = document.getElementById('system_prompt').value.trim();
+            const temperature = document.getElementById('temperature').value.trim();
+            const max_tokens = document.getElementById('max_tokens').value.trim();
+            const tools = document.getElementById('tools').value.trim();
+            const tool_choice = document.getElementById('tool_choice').value.trim();
+            const stream = document.getElementById('stream').checked;
+            const thinking = document.getElementById('thinking').checked;
+
+            // Update agentConfig (current editing config)
+            agentConfig.model = model || "claude-3-haiku-20240307";
+            agentConfig.system_prompt = system_prompt || null;
+            agentConfig.temperature = temperature ? parseFloat(temperature) : null;
+            agentConfig.max_tokens = max_tokens ? parseInt(max_tokens, 10) : null;
+
+            // Parse tools (comma-separated)
+            if (tools) {
+                agentConfig.tools = tools.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            } else {
+                agentConfig.tools = null;
+            }
+
+            agentConfig.tool_choice = tool_choice || null;
+            agentConfig.stream = stream;
+            agentConfig.thinking = thinking ? true : null;
+
+            // Save to agent-specific configs
+            agentConfigs[activeAgentId] = { ...agentConfig };
+            saveConfigToStorage();
+            closeConfigModal();
+
+            // Show notification
+            alert('Configuration saved for current agent.');
+        }
+
+        // Load config on startup
+        loadConfig();
 
         // API functions
         async function fetchAgents() {
@@ -538,14 +899,32 @@
         async function createAgent() {
             console.log('Create agent button clicked');
             try {
+                // Use saved configuration
+                const settings = {
+                    model: agentConfig.model,
+                    system_prompt: agentConfig.system_prompt,
+                    temperature: agentConfig.temperature,
+                    tools: agentConfig.tools,
+                    tool_choice: agentConfig.tool_choice,
+                    stream: agentConfig.stream,
+                    thinking: agentConfig.thinking,
+                    max_tokens: agentConfig.max_tokens
+                };
                 console.log('Sending request to', `${API_BASE}/create`);
-                const response = await fetch(`${API_BASE}/create`);
+                const response = await fetch(`${API_BASE}/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
                 console.log('Response status:', response.status);
                 const data = await response.json();
                 console.log('Response data:', data);
                 if (data.ok) {
                     console.log('Agent created:', data.result);
                     agents.push(data.result);
+                    // Save configuration for this new agent
+                    agentConfigs[data.result] = { ...agentConfig };
+                    saveConfigToStorage();
                     renderAgentList();
                     selectAgent(data.result);
                 } else {
@@ -566,6 +945,9 @@
                 const data = await response.json();
                 if (data.ok) {
                     agents = agents.filter(id => id !== uuid);
+                    // Remove configuration for deleted agent
+                    delete agentConfigs[uuid];
+                    saveConfigToStorage();
                     renderAgentList();
                     if (activeAgentId === uuid) {
                         disconnectEventSource();
@@ -642,6 +1024,22 @@
 
             disconnectEventSource();
             activeAgentId = uuid;
+            // Load this agent's configuration into agentConfig
+            if (agentConfigs[uuid]) {
+                agentConfig = { ...agentConfigs[uuid] };
+            } else {
+                // Reset to default config
+                agentConfig = {
+                    model: "claude-3-haiku-20240307",
+                    system_prompt: null,
+                    temperature: null,
+                    tools: null,
+                    tool_choice: null,
+                    stream: true,
+                    thinking: null,
+                    max_tokens: null
+                };
+            }
             renderAgentList();
             showChatContainer();
             document.getElementById('agentIdDisplay').textContent = uuid;
@@ -859,9 +1257,11 @@
                         chunk.messages.forEach(msg => {
                             // msg is already a Message due to transparent serialization
                             if (msg.role === 'system') {
-                                addSystemMessage(msg.content);
+                                const nameDisplay = msg.name ? ` (${msg.name})` : '';
+                                addSystemMessage(`System${nameDisplay}: ${msg.content}`);
                             } else if (msg.role === 'user') {
-                                addMessage('user', msg.content);
+                                const nameDisplay = msg.name ? ` (${msg.name})` : '';
+                                addMessage('user', `User${nameDisplay}: ${msg.content}`);
                             } else if (msg.role === 'assistant') {
                                 // Assistant message may have content and reasoning
                                 if (msg.reasoning_content) {
@@ -875,7 +1275,27 @@
                                 if (msg.content) {
                                     addMessage('assistant', msg.content);
                                 }
-                                // TODO: handle tool_calls if needed
+                                // Handle tool_calls
+                                if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+                                    msg.tool_calls.forEach(toolCall => {
+                                        const container = document.getElementById('chatMessages');
+                                        const div = document.createElement('div');
+                                        div.className = 'tool-call';
+                                        let argsDisplay = toolCall.function.arguments;
+                                        try {
+                                            const parsed = JSON.parse(toolCall.function.arguments);
+                                            argsDisplay = JSON.stringify(parsed, null, 2);
+                                        } catch (e) {}
+                                        div.innerHTML = `
+                                            <div class="tool-call-header">
+                                                <span class="tool-call-name">Tool: ${toolCall.function.name}</span>
+                                                <span class="tool-call-id">ID: ${toolCall.id}</span>
+                                            </div>
+                                            <pre><code>${escapeHtml(argsDisplay)}</code></pre>
+                                        `;
+                                        container.appendChild(div);
+                                    });
+                                }
                             } else if (msg.role === 'tool') {
                                 // Tool messages might be displayed differently
                                 addSystemMessage(`Tool (${msg.tool_call_id}): ${msg.content}`);
@@ -927,5 +1347,76 @@
         fetchAgents();
         setInterval(fetchAgents, 5000); // Poll every 5 seconds
     </script>
+
+    <!-- Configuration Modal -->
+    <div class="modal" id="configModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Agent Configuration</h2>
+                <button class="close-btn" onclick="closeConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="configForm">
+                    <div class="form-group">
+                        <label for="model">Model</label>
+                        <input type="text" id="model" class="form-control" placeholder="claude-3-haiku-20240307" required>
+                        <div class="form-help">The model to use for the agent</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="system_prompt">System Prompt</label>
+                        <textarea id="system_prompt" class="form-control" rows="4" placeholder="You are a helpful assistant."></textarea>
+                        <div class="form-help">Optional system prompt for the agent</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="temperature">Temperature</label>
+                            <input type="number" id="temperature" class="form-control" step="0.1" min="0" max="2" placeholder="1.0">
+                            <div class="form-help">Controls randomness (0.0 to 2.0)</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="max_tokens">Max Tokens</label>
+                            <input type="number" id="max_tokens" class="form-control" min="1" placeholder="4096">
+                            <div class="form-help">Maximum tokens to generate</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tools">Tools (comma-separated)</label>
+                        <input type="text" id="tools" class="form-control" placeholder="bash, ls, grep, cat, sed, tail">
+                        <div class="form-help">Available tools: bash, ls, grep, cat, sed, tail</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tool_choice">Tool Choice</label>
+                        <input type="text" id="tool_choice" class="form-control" placeholder="auto">
+                        <div class="form-help">Tool choice mode: auto, none, or specific tool name</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="stream" checked>
+                                <label for="stream">Enable Streaming</label>
+                            </div>
+                            <div class="form-help">Stream responses from the agent</div>
+                        </div>
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="thinking">
+                                <label for="thinking">Enable Thinking</label>
+                            </div>
+                            <div class="form-help">Enable reasoning/thinking mode</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeConfigModal()">Cancel</button>
+                <button class="modal-btn save" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

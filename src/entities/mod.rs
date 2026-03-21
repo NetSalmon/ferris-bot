@@ -1,25 +1,10 @@
 mod impls;
 pub mod runtime;
+pub mod service;
 pub mod stream;
 
 use serde::{Deserialize, Serialize};
-use crate::entities::stream::Chunk;
-
-#[derive(Serialize, Debug)]
-pub struct ApiResponse<T> {
-    pub ok: bool,
-    pub result: T,
-}
-
-impl<T> ApiResponse<T> {
-    pub fn ok(result: T) -> Self {
-        Self { ok: true, result }
-    }
-
-    pub fn err(result: T) -> Self {
-        Self { ok: false, result }
-    }
-}
+use service::Chunk;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Request {
@@ -41,10 +26,15 @@ pub struct Request {
 
 #[derive(Debug)]
 pub enum AgentTask {
-    Input { content: String },
-    MessageRequest { channel: tokio::sync::oneshot::Sender<Chunk> }
+    Input {
+        content: String,
+    },
+    MessageRequest {
+        channel: tokio::sync::oneshot::Sender<Chunk>,
+    },
 }
 
+// 准备加入上下文管理功能（编辑、删除）
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct MarkedMessage {
@@ -83,7 +73,7 @@ pub enum Message {
     },
     Tool {
         content: String,
-        tool_call_id: String, // Tool 角色强制要求 ID
+        tool_call_id: String,
     },
 }
 

@@ -1,27 +1,58 @@
-use crate::entities::{MarkedMessage, Message, Request, Tool};
-
-pub struct RequestBuilder {
-    pub model: String,
-    pub messages: Vec<Message>,
-    pub tools: Option<Vec<Tool>>,
-    pub tool_choice: Option<String>,
-    pub temperature: Option<f32>,
-    pub stream: Option<bool>,
-    pub max_tokens: Option<u32>,
-    pub enable_thinking: Option<bool>,
-}
+use crate::entities::service::AgentSettings;
+use crate::entities::{FunctionDetail, MarkedMessage, Message, Request, Tool};
+use crate::tools::TOOL_ROUTERS;
 
 impl Request {
-    pub fn builder() -> RequestBuilder {
-        RequestBuilder {
-            model: String::new(),
-            messages: vec![],
-            tools: None,
-            tool_choice: None,
-            temperature: None,
-            stream: None,
-            max_tokens: None,
-            enable_thinking: None,
+    pub fn from(setting: AgentSettings) -> Self {
+        let system_prompt = setting
+            .system_prompt
+            .clone()
+            .unwrap_or("You are a helpful assistant.".to_string());
+
+        let system_message = Message::System {
+            content: system_prompt,
+            name: None,
+        };
+
+        let messages: Vec<MarkedMessage> = vec![MarkedMessage {
+            id: 1,
+            message: system_message,
+        }];
+
+        let tools = if let Some(tools) = setting.tools {
+            if let Some(map) = TOOL_ROUTERS.get() {
+                let mut results = vec![];
+                for tool in tools {
+                    let Some(got) = map.get(&tool) else {
+                        continue;
+                    };
+                    let t = Tool {
+                        r#type: "function".to_string(),
+                        function: FunctionDetail {
+                            name: got.name(),
+                            description: got.description(),
+                            parameters: got.parameters(),
+                        },
+                    };
+                    results.push(t);
+                }
+                Some(results)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self {
+            model: setting.model,
+            messages,
+            tools,
+            tool_choice: setting.tool_choice,
+            temperature: setting.temperature,
+            stream: setting.stream,
+            max_tokens: setting.max_tokens,
+            enable_thinking: setting.thinking,
         }
     }
 
@@ -31,85 +62,5 @@ impl Request {
             message,
         };
         self.messages.push(marked);
-    }
-
-    pub fn push_tool(mut self, tool: Tool) {
-        match &mut self.tools {
-            Some(tools) => tools.push(tool),
-            None => self.tools = Some(vec![tool]),
-        }
-    }
-}
-
-impl RequestBuilder {
-    pub fn build(self) -> Request {
-        Request {
-            model: self.model,
-            messages: self
-                .messages
-                .into_iter()
-                .enumerate()
-                .map(|(id, message)| MarkedMessage { id, message })
-                .collect(),
-            tools: self.tools,
-            tool_choice: self.tool_choice,
-            temperature: self.temperature,
-            stream: self.stream,
-            max_tokens: self.max_tokens,
-            enable_thinking: self.enable_thinking,
-        }
-    }
-
-    pub fn set_model(mut self, model: &str) -> Self {
-        self.model = model.to_string();
-        self
-    }
-
-    pub fn push_message(mut self, message: Message) -> Self {
-        self.messages.push(message);
-        self
-    }
-
-    pub fn push_tool(mut self, tool: Tool) -> Self {
-        match &mut self.tools {
-            Some(tools) => tools.push(tool),
-            None => self.tools = Some(vec![tool]),
-        }
-        self
-    }
-
-    pub fn set_tool_choice(mut self, choice: String) -> Self {
-        self.tool_choice = Some(choice);
-        self
-    }
-
-    pub fn set_temperature(mut self, temperature: f32) -> Self {
-        self.temperature = Some(temperature);
-        self
-    }
-
-    pub fn enable_thinking(mut self) -> Self {
-        self.enable_thinking = Some(true);
-        self
-    }
-
-    pub fn disable_thinking(mut self) -> Self {
-        self.enable_thinking = Some(false);
-        self
-    }
-
-    pub fn enable_stream(mut self) -> Self {
-        self.stream = Some(true);
-        self
-    }
-
-    pub fn disable_stream(mut self) -> Self {
-        self.stream = Some(false);
-        self
-    }
-
-    pub fn set_max_tokens(mut self, max_tokens: u32) -> Self {
-        self.max_tokens = Some(max_tokens);
-        self
     }
 }

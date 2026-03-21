@@ -1,5 +1,6 @@
 use crate::client::Client;
-use crate::entities::stream::{Chunk, ResponseBuffer};
+use crate::entities::service::Chunk;
+use crate::entities::stream::ResponseBuffer;
 use crate::entities::{Request, Response};
 use crate::error::AppError;
 use crate::error::AppError::InternalError;
